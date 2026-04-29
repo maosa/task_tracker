@@ -1,5 +1,35 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
+// Convenience row types
+export type TaskRow = {
+  id: string
+  admin_user_id: string
+  product: Product
+  project_id: string | null
+  description: string
+  week_start_date: string
+  status: TaskStatus
+  is_flagged: boolean
+  sort_order: number
+  created_by: string
+  created_at: string
+  updated_at: string | null
+  updated_by: string | null
+}
+
+export type ProjectRow = {
+  id: string
+  admin_user_id: string
+  name: string
+  created_at: string
+  updated_at: string | null
+  deleted_at: string | null
+}
+
+export interface TaskWithProject extends TaskRow {
+  project_name: string | null
+}
+
 export type Product = 'AH' | 'NURO' | 'EH'
 export type TaskStatus = 'open' | 'complete'
 export type RelationshipStatus = 'pending' | 'accepted' | 'archived'

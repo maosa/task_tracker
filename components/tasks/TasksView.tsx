@@ -1,8 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import ProductBadge from './ProductBadge'
-import { MOCK_TASKS, type MockTask } from '@/lib/mock-data'
+import AddTaskModal from './AddTaskModal'
+import { supabase } from '@/lib/supabase/client'
+import { MOCK_TASKS } from '@/lib/mock-data'
+import type { MockTask } from '@/lib/mock-data'
+import type { TaskWithProject, ProjectRow } from '@/lib/supabase/types'
 import {
   getCurrentWeekIndex,
   weekIndexToDateString,
@@ -10,7 +31,43 @@ import {
   dateStringToWeekIndex,
 } from '@/lib/weeks'
 
+const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
+const USE_REAL_DATA = Boolean(ADMIN_USER_ID)
+
 type ViewMode = 'focused' | 'expanded'
+
+// ─── Toasts ──────────────────────────────────────────────────────────────────
+
+interface Toast {
+  id: string
+  message: string
+  type: 'success' | 'error'
+}
+
+function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-[6px] text-[13px] font-medium shadow-lg border ${
+            t.type === 'error'
+              ? 'bg-white border-[#FF0522] text-[#CC0015]'
+              : 'bg-[#19153F] border-transparent text-white'
+          }`}
+        >
+          {t.message}
+          <button
+            onClick={() => onDismiss(t.id)}
+            className="ml-1 opacity-60 hover:opacity-100 text-[11px] font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +104,303 @@ function SearchIcon() {
   )
 }
 
+function FlagIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 1.5v11M2.5 1.5h7l-2 3.5 2 3.5H2.5"
+        stroke={filled ? '#FF0522' : 'currentColor'}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={filled ? '#FF0522' : 'none'}
+      />
+    </svg>
+  )
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2 3.5h10M5.5 3.5V2h3v1.5M5 3.5l.5 8M9 3.5l-.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function GripIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <circle cx="4" cy="3" r="1" fill="currentColor" />
+      <circle cx="8" cy="3" r="1" fill="currentColor" />
+      <circle cx="4" cy="6" r="1" fill="currentColor" />
+      <circle cx="8" cy="6" r="1" fill="currentColor" />
+      <circle cx="4" cy="9" r="1" fill="currentColor" />
+      <circle cx="8" cy="9" r="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+// ─── Task normalisation ───────────────────────────────────────────────────────
+
+type AnyTask = TaskWithProject | MockTask
+
+function taskBg(t: AnyTask): React.CSSProperties {
+  if (t.status === 'complete') return { backgroundColor: '#C3FFF8' }
+  if (t.is_flagged) return { backgroundColor: '#FFCDD3' }
+  return { backgroundColor: '#FFFFFF' }
+}
+
+function descClass(t: AnyTask): string {
+  if (t.status === 'complete') return 'line-through text-[#797979]'
+  if (t.is_flagged) return 'text-[#CC0015]'
+  return 'text-[#19153F]'
+}
+
+function projectName(t: AnyTask): string {
+  if ('project_name' in t) return t.project_name ?? '—'
+  return (t as MockTask).project_name
+}
+
+// ─── Delete confirmation modal ────────────────────────────────────────────────
+
+function DeleteConfirmModal({
+  onConfirm,
+  onCancel,
+  deleting,
+}: {
+  onConfirm: () => void
+  onCancel: () => void
+  deleting: boolean
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
+    >
+      <div className="bg-white rounded-[12px] shadow-xl w-full max-w-sm mx-4 p-6">
+        <h2 className="text-[15px] font-medium text-[#19153F] mb-2">Delete task?</h2>
+        <p className="text-[13px] text-[#595959] mb-6">
+          Are you sure you want to delete this task? This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-[13px] font-medium border border-[#DADADA] rounded-[6px] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] transition-colors bg-white"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            className="px-4 py-2 text-[13px] font-medium bg-[#FF0522] text-white rounded-[6px] border border-transparent hover:bg-[#cc0015] disabled:opacity-60 transition-colors"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Move dropdown ────────────────────────────────────────────────────────────
+
+const MOVE_OPTIONS = [
+  { label: 'Next week (+1)', weeks: 1 },
+  { label: '+2 weeks', weeks: 2 },
+  { label: '+3 weeks', weeks: 3 },
+  { label: '+4 weeks', weeks: 4 },
+]
+
+function MoveDropdown({
+  onMove,
+  onClose,
+}: {
+  onMove: (weeks: number) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#DADADA] rounded-[6px] shadow-md min-w-[150px] py-1 overflow-hidden"
+    >
+      {MOVE_OPTIONS.map((opt) => (
+        <button
+          key={opt.weeks}
+          onClick={() => { onMove(opt.weeks); onClose() }}
+          className="w-full text-left px-3 py-1.5 text-[13px] text-[#595959] hover:bg-[#F2F2F2] hover:text-[#19153F] transition-colors"
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Sortable task row ────────────────────────────────────────────────────────
+
+interface RowProps {
+  task: AnyTask
+  visibleWeekIndices: number[]
+  onToggleComplete: (id: string) => void
+  onToggleFlag: (id: string) => void
+  onMove: (id: string, weeks: number) => void
+  onDelete: (id: string) => void
+  isDragMode: boolean
+}
+
+function SortableTaskRow(props: RowProps) {
+  const { task, visibleWeekIndices, onToggleComplete, onToggleFlag, onMove, onDelete, isDragMode } = props
+  const [showMoveDropdown, setShowMoveDropdown] = useState(false)
+  const taskWeekIndex = dateStringToWeekIndex(task.week_start_date)
+  const bg = taskBg(task)
+  const dc = descClass(task)
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <tr ref={setNodeRef} style={{ ...style, ...bg }} className="group">
+      {/* Product — sticky, with drag handle */}
+      <td
+        className="sticky left-0 z-10 border-b border-r border-[#DADADA] px-3 py-2.5"
+        style={{ ...bg }}
+      >
+        <div className="flex items-center gap-1.5">
+          {isDragMode && (
+            <span
+              {...attributes}
+              {...listeners}
+              className="opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing text-[#595959] flex-shrink-0"
+              title="Drag to reorder"
+            >
+              <GripIcon />
+            </span>
+          )}
+          <ProductBadge product={task.product} />
+        </div>
+      </td>
+
+      {/* Project — sticky */}
+      <td
+        className="sticky z-10 border-b border-r border-[#DADADA] px-3 py-2.5 text-[13px] text-[#595959] whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]"
+        style={{ left: 110, ...bg, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
+      >
+        {projectName(task)}
+      </td>
+
+      {/* Week cells */}
+      {visibleWeekIndices.map((wi) => {
+        const isTaskWeek = wi === taskWeekIndex
+        return (
+          <td
+            key={wi}
+            className="border-b border-r border-[#DADADA] px-3 py-2.5 text-[13px]"
+            style={isTaskWeek ? bg : { backgroundColor: '#FFFFFF' }}
+          >
+            {isTaskWeek && (
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Checkbox */}
+                <button
+                  onClick={() => onToggleComplete(task.id)}
+                  className={`flex-shrink-0 w-[15px] h-[15px] rounded-[3px] border flex items-center justify-center transition-colors ${
+                    task.status === 'complete'
+                      ? 'bg-[#00D1BA] border-[#00D1BA]'
+                      : 'border-[#DADADA] hover:border-[#00D1BA] bg-white'
+                  }`}
+                  title={task.status === 'complete' ? 'Mark open' : 'Mark complete'}
+                >
+                  {task.status === 'complete' && (
+                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                      <path d="M1 3l2.5 2.5L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* Description */}
+                <span className={`flex-1 min-w-0 truncate ${dc}`}>{task.description}</span>
+
+                {/* Row actions — on hover */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity relative">
+                  {/* Flag */}
+                  <button
+                    onClick={() => onToggleFlag(task.id)}
+                    className="p-1 rounded text-[#797979] hover:text-[#FF0522] hover:bg-[#FFF0F2] transition-colors"
+                    title={task.is_flagged ? 'Unflag' : 'Flag for manager'}
+                  >
+                    <FlagIcon filled={task.is_flagged} />
+                  </button>
+
+                  {/* Move */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowMoveDropdown((v) => !v)}
+                      className="p-1 rounded text-[#797979] hover:text-[#19153F] hover:bg-[#F2F2F2] transition-colors"
+                      title="Move to future week"
+                    >
+                      <ArrowRightIcon />
+                    </button>
+                    {showMoveDropdown && (
+                      <MoveDropdown
+                        onMove={(weeks) => onMove(task.id, weeks)}
+                        onClose={() => setShowMoveDropdown(false)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => onDelete(task.id)}
+                    className="p-1 rounded text-[#797979] hover:text-[#FF0522] hover:bg-[#FFF0F2] transition-colors"
+                    title="Delete task"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              </div>
+            )}
+          </td>
+        )
+      })}
+    </tr>
+  )
+}
+
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 interface ToolbarProps {
@@ -57,6 +411,7 @@ interface ToolbarProps {
   onPrev: () => void
   onNext: () => void
   onToday: () => void
+  onAddTask: () => void
 }
 
 function Toolbar({
@@ -67,6 +422,7 @@ function Toolbar({
   onPrev,
   onNext,
   onToday,
+  onAddTask,
 }: ToolbarProps) {
   const isAtCurrentWeek = centerWeekIndex === currentWeekIndex
 
@@ -74,9 +430,8 @@ function Toolbar({
     <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-[#DADADA] flex-shrink-0">
       {/* Add task */}
       <button
+        onClick={onAddTask}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#19153F] text-white text-[13px] font-medium rounded-[6px] border border-transparent hover:bg-[#2a2460] transition-colors"
-        disabled
-        title="Add task (Phase 3)"
       >
         <PlusIcon />
         Add task
@@ -149,31 +504,36 @@ function Toolbar({
   )
 }
 
-// ─── Task row cells ────────────────────────────────────────────────────────────
-
-function rowStyle(task: MockTask): React.CSSProperties {
-  if (task.status === 'complete') return { backgroundColor: '#C3FFF8' }
-  if (task.is_flagged) return { backgroundColor: '#FFCDD3' }
-  return { backgroundColor: '#FFFFFF' }
-}
-
-function descriptionStyle(task: MockTask): string {
-  if (task.status === 'complete') return 'line-through text-[#797979]'
-  if (task.is_flagged) return 'text-[#CC0015]'
-  return 'text-[#19153F]'
-}
-
-// ─── Table ────────────────────────────────────────────────────────────────────
+// ─── Task table ────────────────────────────────────────────────────────────────
 
 interface TaskTableProps {
-  tasks: MockTask[]
+  tasks: AnyTask[]
   visibleWeekIndices: number[]
   currentWeekIndex: number
-  viewMode: ViewMode
+  onToggleComplete: (id: string) => void
+  onToggleFlag: (id: string) => void
+  onMove: (id: string, weeks: number) => void
+  onDelete: (id: string) => void
+  onAddTaskInWeek: (weekIndex: number) => void
+  onReorder: (orderedIds: string[], weekDateStr: string) => void
 }
 
-function TaskTable({ tasks, visibleWeekIndices, currentWeekIndex, viewMode }: TaskTableProps) {
-  // Filter and sort tasks: only those in visible weeks, sorted by week then sort_order
+function TaskTable({
+  tasks,
+  visibleWeekIndices,
+  currentWeekIndex,
+  onToggleComplete,
+  onToggleFlag,
+  onMove,
+  onDelete,
+  onAddTaskInWeek,
+  onReorder,
+}: TaskTableProps) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
   const visibleWeekStrings = new Set(visibleWeekIndices.map(weekIndexToDateString))
 
   const visibleTasks = tasks
@@ -185,146 +545,147 @@ function TaskTable({ tasks, visibleWeekIndices, currentWeekIndex, viewMode }: Ta
       return a.sort_order - b.sort_order
     })
 
-  const hasTasks = visibleTasks.length > 0
+  const taskIds = visibleTasks.map((t) => t.id)
+  const activeTask = activeId ? visibleTasks.find((t) => t.id === activeId) : null
+
+  const handleDragStart = (e: DragStartEvent) => {
+    setActiveId(e.active.id as string)
+  }
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+
+    const draggedTask = visibleTasks.find((t) => t.id === active.id)
+    const targetTask = visibleTasks.find((t) => t.id === over.id)
+    if (!draggedTask || !targetTask) return
+    if (draggedTask.week_start_date !== targetTask.week_start_date) return
+
+    const weekStr = draggedTask.week_start_date
+    const weekTasks = visibleTasks.filter((t) => t.week_start_date === weekStr)
+    const oldIdx = weekTasks.findIndex((t) => t.id === active.id)
+    const newIdx = weekTasks.findIndex((t) => t.id === over.id)
+    const reordered = arrayMove(weekTasks, oldIdx, newIdx)
+    onReorder(reordered.map((t) => t.id), weekStr)
+  }
 
   return (
-    <div className="overflow-x-auto flex-1">
-      <table
-        className="border-collapse"
-        style={{ minWidth: '100%', tableLayout: 'fixed' }}
-      >
-        <colgroup>
-          <col style={{ width: 110, minWidth: 110 }} />
-          <col style={{ width: 130, minWidth: 130 }} />
-          {visibleWeekIndices.map((wi) => (
-            <col key={wi} style={{ minWidth: 200 }} />
-          ))}
-        </colgroup>
-
-        {/* Header */}
-        <thead>
-          <tr>
-            {/* Product header — sticky */}
-            <th
-              className="sticky left-0 z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
-              style={{ boxShadow: 'none' }}
-            >
-              Product
-            </th>
-
-            {/* Project header — sticky */}
-            <th
-              className="sticky z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
-              style={{ left: 110, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
-            >
-              Project
-            </th>
-
-            {/* Week headers */}
-            {visibleWeekIndices.map((wi) => {
-              const isCurrent = wi === currentWeekIndex
-              return (
-                <th
-                  key={wi}
-                  className="border-b border-r border-[#DADADA] px-3 py-2 text-left text-[13px] font-medium text-[#19153F] bg-[#F2F2F2]"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={isCurrent ? 'pb-0.5 border-b-2 border-[#00D1BA]' : ''}
-                    >
-                      {formatWeekHeader(wi)}
-                    </span>
-                    {isCurrent && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#00D1BA] text-[#19153F] leading-none">
-                        current
-                      </span>
-                    )}
-                  </div>
-                </th>
-              )
-            })}
-          </tr>
-        </thead>
-
-        {/* Body */}
-        <tbody>
-          {!hasTasks && (
-            <tr>
-              <td
-                colSpan={2 + visibleWeekIndices.length}
-                className="px-4 py-8 text-center text-[13px] text-[#797979]"
-              >
-                No tasks for this period.
-              </td>
-            </tr>
-          )}
-
-          {visibleTasks.map((task) => {
-            const taskWeekIndex = dateStringToWeekIndex(task.week_start_date)
-            const bg = rowStyle(task)
-            const descClass = descriptionStyle(task)
-
-            return (
-              <tr key={task.id} style={bg} className="group">
-                {/* Product — sticky */}
-                <td
-                  className="sticky left-0 z-10 border-b border-r border-[#DADADA] px-3 py-2.5"
-                  style={{ ...bg }}
-                >
-                  <ProductBadge product={task.product} />
-                </td>
-
-                {/* Project — sticky */}
-                <td
-                  className="sticky z-10 border-b border-r border-[#DADADA] px-3 py-2.5 text-[13px] text-[#595959] whitespace-nowrap overflow-hidden text-ellipsis"
-                  style={{ left: 110, ...bg, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
-                >
-                  {task.project_name}
-                </td>
-
-                {/* Week cells */}
-                {visibleWeekIndices.map((wi) => {
-                  const isTaskWeek = wi === taskWeekIndex
-                  return (
-                    <td
-                      key={wi}
-                      className="border-b border-r border-[#DADADA] px-3 py-2.5 text-[13px]"
-                      style={isTaskWeek ? bg : { backgroundColor: '#FFFFFF' }}
-                    >
-                      {isTaskWeek && (
-                        <span className={descClass}>{task.description}</span>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
-
-          {/* "Add task" footer row placeholder (Phase 3) */}
-          <tr>
-            <td
-              className="sticky left-0 z-10 bg-white border-r border-[#DADADA]"
-              style={{ boxShadow: 'none' }}
-            />
-            <td
-              className="sticky z-10 bg-white border-r border-[#DADADA]"
-              style={{ left: 110, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
-            />
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="overflow-x-auto flex-1">
+        <table className="border-collapse" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 110, minWidth: 110 }} />
+            <col style={{ width: 130, minWidth: 130 }} />
             {visibleWeekIndices.map((wi) => (
-              <td
-                key={wi}
-                className="border-r border-[#DADADA] px-3 py-2"
-              >
-                <span className="text-[12px] text-[#797979] opacity-0 group-hover:opacity-100">
-                  + Add task
-                </span>
-              </td>
+              <col key={wi} style={{ minWidth: 200 }} />
             ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
+          </colgroup>
+
+          {/* Header */}
+          <thead>
+            <tr>
+              <th
+                className="sticky left-0 z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
+              >
+                Product
+              </th>
+              <th
+                className="sticky z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
+                style={{ left: 110, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
+              >
+                Project
+              </th>
+              {visibleWeekIndices.map((wi) => {
+                const isCurrent = wi === currentWeekIndex
+                return (
+                  <th
+                    key={wi}
+                    className="border-b border-r border-[#DADADA] px-3 py-2 text-left text-[13px] font-medium text-[#19153F] bg-[#F2F2F2]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={isCurrent ? 'pb-0.5 border-b-2 border-[#00D1BA]' : ''}>
+                        {formatWeekHeader(wi)}
+                      </span>
+                      {isCurrent && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#00D1BA] text-[#19153F] leading-none">
+                          current
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+
+          {/* Body */}
+          <tbody>
+            <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+              {visibleTasks.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={2 + visibleWeekIndices.length}
+                    className="px-4 py-8 text-center text-[13px] text-[#797979]"
+                  >
+                    No tasks for this period.
+                  </td>
+                </tr>
+              )}
+              {visibleTasks.map((task) => (
+                <SortableTaskRow
+                  key={task.id}
+                  task={task}
+                  visibleWeekIndices={visibleWeekIndices}
+                  onToggleComplete={onToggleComplete}
+                  onToggleFlag={onToggleFlag}
+                  onMove={onMove}
+                  onDelete={onDelete}
+                  isDragMode={true}
+                />
+              ))}
+            </SortableContext>
+
+            {/* "Add task" footer row per week */}
+            <tr className="group">
+              <td className="sticky left-0 z-10 bg-white border-r border-[#DADADA]" />
+              <td
+                className="sticky z-10 bg-white border-r border-[#DADADA]"
+                style={{ left: 110, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
+              />
+              {visibleWeekIndices.map((wi) => (
+                <td key={wi} className="border-r border-[#DADADA] px-3 py-2">
+                  <button
+                    onClick={() => onAddTaskInWeek(wi)}
+                    className="text-[12px] text-[#797979] hover:text-[#38308F] transition-colors"
+                  >
+                    + Add task
+                  </button>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Drag overlay */}
+      <DragOverlay>
+        {activeTask && (
+          <div
+            className="flex items-center gap-2 px-3 py-2.5 rounded shadow-lg text-[13px] font-medium opacity-90"
+            style={{ backgroundColor: '#19153F', color: '#fff', width: 300 }}
+          >
+            <ProductBadge product={activeTask.product} />
+            <span className="truncate">{activeTask.description}</span>
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   )
 }
 
@@ -335,10 +696,192 @@ export default function TasksView() {
   const [viewMode, setViewMode] = useState<ViewMode>('focused')
   const [centerWeekIndex, setCenterWeekIndex] = useState(todayWeekIndex)
 
+  const [tasks, setTasks] = useState<AnyTask[]>([])
+  const [projects, setProjects] = useState<ProjectRow[]>([])
+  const [loading, setLoading] = useState(USE_REAL_DATA)
+
+  const [addModalWeekIndex, setAddModalWeekIndex] = useState<number | null>(null)
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    const id = Math.random().toString(36).slice(2)
+    setToasts((prev) => [...prev, { id, message, type }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
+  }, [])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  // Fetch tasks and projects
+  useEffect(() => {
+    if (!USE_REAL_DATA) {
+      setTasks(MOCK_TASKS)
+      return
+    }
+    const loadData = async () => {
+      setLoading(true)
+      const [tasksRes, projectsRes] = await Promise.all([
+        supabase
+          .from('tasks')
+          .select('*, projects(name)')
+          .eq('admin_user_id', ADMIN_USER_ID!)
+          .order('week_start_date')
+          .order('sort_order'),
+        supabase
+          .from('projects')
+          .select('*')
+          .eq('admin_user_id', ADMIN_USER_ID!)
+          .is('deleted_at', null)
+          .order('name'),
+      ])
+
+      if (tasksRes.data) {
+        const mapped: TaskWithProject[] = tasksRes.data.map((row) => {
+          const proj = row.projects as { name: string } | null
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { projects: _p, ...rest } = row
+          return { ...rest, project_name: proj?.name ?? null }
+        })
+        setTasks(mapped)
+      }
+      if (projectsRes.data) setProjects(projectsRes.data)
+      setLoading(false)
+    }
+    loadData()
+  }, [])
+
   const visibleWeekIndices =
     viewMode === 'focused'
       ? [centerWeekIndex]
       : [centerWeekIndex - 1, centerWeekIndex, centerWeekIndex + 1].filter((w) => w >= 0)
+
+  // ── CRUD handlers ──────────────────────────────────────────────────────────
+
+  const handleToggleComplete = useCallback(async (id: string) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, status: t.status === 'complete' ? 'open' : 'complete' } : t
+      )
+    )
+    if (!USE_REAL_DATA) return
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+    const newStatus = task.status === 'complete' ? 'open' : 'complete'
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: newStatus, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+      .eq('id', id)
+    if (error) {
+      addToast('Failed to update task.', 'error')
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: task.status } : t))
+      )
+    }
+  }, [tasks, addToast])
+
+  const handleToggleFlag = useCallback(async (id: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, is_flagged: !t.is_flagged } : t))
+    )
+    if (!USE_REAL_DATA) return
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+    const { error } = await supabase
+      .from('tasks')
+      .update({ is_flagged: !task.is_flagged, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+      .eq('id', id)
+    if (error) {
+      addToast('Failed to update task.', 'error')
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, is_flagged: task.is_flagged } : t))
+      )
+    }
+  }, [tasks, addToast])
+
+  const handleMove = useCallback(async (id: string, weeks: number) => {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+    const oldIndex = dateStringToWeekIndex(task.week_start_date)
+    const newIndex = oldIndex + weeks
+    const newDate = weekIndexToDateString(newIndex)
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, week_start_date: newDate } : t))
+    )
+    addToast(`Task moved to ${formatWeekHeader(newIndex)}.`)
+
+    if (!USE_REAL_DATA) return
+    const { error } = await supabase
+      .from('tasks')
+      .update({ week_start_date: newDate, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+      .eq('id', id)
+    if (error) {
+      addToast('Failed to move task.', 'error')
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, week_start_date: task.week_start_date } : t))
+      )
+    }
+  }, [tasks, addToast])
+
+  const handleDeleteRequest = useCallback((id: string) => {
+    setDeleteTaskId(id)
+  }, [])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTaskId) return
+    setDeleting(true)
+    if (USE_REAL_DATA) {
+      const { error } = await supabase.from('tasks').delete().eq('id', deleteTaskId)
+      if (error) {
+        addToast('Failed to delete task.', 'error')
+        setDeleting(false)
+        setDeleteTaskId(null)
+        return
+      }
+    }
+    setTasks((prev) => prev.filter((t) => t.id !== deleteTaskId))
+    addToast('Task deleted.')
+    setDeleting(false)
+    setDeleteTaskId(null)
+  }, [deleteTaskId, addToast])
+
+  const handleReorder = useCallback(async (orderedIds: string[], weekDateStr: string) => {
+    setTasks((prev) => {
+      const otherTasks = prev.filter((t) => t.week_start_date !== weekDateStr)
+      const weekTasks = prev.filter((t) => t.week_start_date === weekDateStr)
+      const reordered = orderedIds
+        .map((id) => weekTasks.find((t) => t.id === id))
+        .filter((t): t is AnyTask => Boolean(t))
+        .map((t, idx) => ({ ...t, sort_order: idx }))
+      return [...otherTasks, ...reordered].sort((a, b) => {
+        const wA = dateStringToWeekIndex(a.week_start_date)
+        const wB = dateStringToWeekIndex(b.week_start_date)
+        return wA !== wB ? wA - wB : a.sort_order - b.sort_order
+      })
+    })
+
+    if (!USE_REAL_DATA) return
+    await Promise.all(
+      orderedIds.map((id, idx) =>
+        supabase
+          .from('tasks')
+          .update({ sort_order: idx, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+          .eq('id', id)
+      )
+    )
+  }, [])
+
+  const handleTaskCreated = useCallback((task: TaskWithProject) => {
+    setTasks((prev) => {
+      const weekTasks = prev.filter((t) => t.week_start_date === task.week_start_date)
+      return [...prev, { ...task, sort_order: weekTasks.length }]
+    })
+    setAddModalWeekIndex(null)
+    addToast('Task created.')
+  }, [addToast])
 
   return (
     <div className="flex flex-col h-full">
@@ -350,13 +893,45 @@ export default function TasksView() {
         onPrev={() => setCenterWeekIndex((w) => Math.max(0, w - 1))}
         onNext={() => setCenterWeekIndex((w) => w + 1)}
         onToday={() => setCenterWeekIndex(todayWeekIndex)}
+        onAddTask={() => setAddModalWeekIndex(centerWeekIndex)}
       />
-      <TaskTable
-        tasks={MOCK_TASKS}
-        visibleWeekIndices={visibleWeekIndices}
-        currentWeekIndex={todayWeekIndex}
-        viewMode={viewMode}
-      />
+
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-[13px] text-[#797979]">
+          Loading tasks…
+        </div>
+      ) : (
+        <TaskTable
+          tasks={tasks}
+          visibleWeekIndices={visibleWeekIndices}
+          currentWeekIndex={todayWeekIndex}
+          onToggleComplete={handleToggleComplete}
+          onToggleFlag={handleToggleFlag}
+          onMove={handleMove}
+          onDelete={handleDeleteRequest}
+          onAddTaskInWeek={(wi) => setAddModalWeekIndex(wi)}
+          onReorder={handleReorder}
+        />
+      )}
+
+      {addModalWeekIndex !== null && (
+        <AddTaskModal
+          weekIndex={addModalWeekIndex}
+          projects={projects}
+          onClose={() => setAddModalWeekIndex(null)}
+          onCreated={handleTaskCreated}
+        />
+      )}
+
+      {deleteTaskId && (
+        <DeleteConfirmModal
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTaskId(null)}
+          deleting={deleting}
+        />
+      )}
+
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
