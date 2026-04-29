@@ -1,36 +1,20 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Task Tracker
 
-## Getting Started
+A week-oriented task management tool for structured personal productivity and team review.
 
-First, run the development server:
+## What it does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Task Tracker organises work into weekly columns, giving you a clear view of what you're working on, what's been completed, and what's carried forward. Each task is tagged by product area and project, making it easy to filter and review work by team or initiative.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Key features:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Weekly task table** — tasks are organised by week, with navigation to move between past and future weeks
+- **Product and project tagging** — every task is associated with a product area (AH, NURO, EH) and a project from your personal project list
+- **Task states** — tasks can be marked complete, flagged for attention, or moved to a future week
+- **Notes and comments** — each task supports a private notes field and a comments thread, intended for async feedback between a team member and their manager
+- **Manager view** — users can invite a manager to view their task list in read-only mode; managers can leave comments on individual tasks
+- **Settings** — manage your project list, account details, and manager relationships from a dedicated settings page
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How it works
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Every user has a single account with two contexts: their own task list (owner) and a manager view (where they can see the task lists of people who have invited them). A user can operate in both contexts simultaneously — for example, managing their own tasks while also reviewing a direct report's list.
