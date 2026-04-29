@@ -20,6 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import ProductBadge from './ProductBadge'
 import AddTaskModal from './AddTaskModal'
+import DetailPanel from './DetailPanel'
 import { supabase } from '@/lib/supabase/client'
 import { MOCK_TASKS } from '@/lib/mock-data'
 import type { MockTask } from '@/lib/mock-data'
@@ -151,6 +152,37 @@ function GripIcon() {
   )
 }
 
+function NoteIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4.5 5h5M4.5 7h5M4.5 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function CommentIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M2 2.5h10a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H8l-2 2-2-2H2a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function PanelIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M9 2v10" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
 // ─── Task normalisation ───────────────────────────────────────────────────────
 
 type AnyTask = TaskWithProject | MockTask
@@ -272,12 +304,13 @@ interface RowProps {
   onToggleFlag: (id: string) => void
   onMove: (id: string, weeks: number) => void
   onDelete: (id: string) => void
+  onOpenPanel: (id: string, section: 'notes' | 'comments') => void
   isDragMode: boolean
   isHighlighted: boolean
 }
 
 function SortableTaskRow(props: RowProps) {
-  const { task, visibleWeekIndices, onToggleComplete, onToggleFlag, onMove, onDelete, isDragMode, isHighlighted } = props
+  const { task, visibleWeekIndices, onToggleComplete, onToggleFlag, onMove, onDelete, onOpenPanel, isDragMode, isHighlighted } = props
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
   const taskWeekIndex = dateStringToWeekIndex(task.week_start_date)
   const bg = taskBg(task)
@@ -387,6 +420,24 @@ function SortableTaskRow(props: RowProps) {
                     )}
                   </div>
 
+                  {/* Notes */}
+                  <button
+                    onClick={() => onOpenPanel(task.id, 'notes')}
+                    className="p-1 rounded text-[#797979] hover:text-[#38308F] hover:bg-[#F2F2F2] transition-colors"
+                    title="View notes"
+                  >
+                    <NoteIcon />
+                  </button>
+
+                  {/* Comment */}
+                  <button
+                    onClick={() => onOpenPanel(task.id, 'comments')}
+                    className="p-1 rounded text-[#797979] hover:text-[#38308F] hover:bg-[#F2F2F2] transition-colors"
+                    title="View comments"
+                  >
+                    <CommentIcon />
+                  </button>
+
                   {/* Delete */}
                   <button
                     onClick={() => onDelete(task.id)}
@@ -427,6 +478,9 @@ interface ToolbarProps {
   showSearchDropdown: boolean
   onSearchResultClick: (task: AnyTask) => void
   onSearchClose: () => void
+  panelOpen: boolean
+  hasPanelTask: boolean
+  onTogglePanel: () => void
 }
 
 function Toolbar({
@@ -444,6 +498,9 @@ function Toolbar({
   showSearchDropdown,
   onSearchResultClick,
   onSearchClose,
+  panelOpen,
+  hasPanelTask,
+  onTogglePanel,
 }: ToolbarProps) {
   const isAtCurrentWeek = centerWeekIndex === currentWeekIndex
   const searchRef = useRef<HTMLDivElement>(null)
@@ -518,6 +575,20 @@ function Toolbar({
           </button>
         ))}
       </div>
+
+      {/* Panel toggle */}
+      <button
+        onClick={onTogglePanel}
+        disabled={!hasPanelTask}
+        title={panelOpen ? 'Close detail panel' : 'Open detail panel'}
+        className={`flex items-center justify-center w-7 h-7 rounded border transition-colors ${
+          panelOpen
+            ? 'bg-[#19153F] text-white border-[#19153F]'
+            : 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F] disabled:opacity-30 disabled:cursor-not-allowed'
+        }`}
+      >
+        <PanelIcon />
+      </button>
 
       {/* Search */}
       <div ref={searchRef} className="relative flex items-center">
@@ -657,6 +728,7 @@ interface TaskTableProps {
   onToggleFlag: (id: string) => void
   onMove: (id: string, weeks: number) => void
   onDelete: (id: string) => void
+  onOpenPanel: (id: string, section: 'notes' | 'comments') => void
   onAddTaskInWeek: (weekIndex: number) => void
   onReorder: (orderedIds: string[], weekDateStr: string) => void
 }
@@ -671,6 +743,7 @@ function TaskTable({
   onToggleFlag,
   onMove,
   onDelete,
+  onOpenPanel,
   onAddTaskInWeek,
   onReorder,
 }: TaskTableProps) {
@@ -797,6 +870,7 @@ function TaskTable({
                   onToggleFlag={onToggleFlag}
                   onMove={onMove}
                   onDelete={onDelete}
+                  onOpenPanel={onOpenPanel}
                   isDragMode={sortMode === 'drag'}
                   isHighlighted={task.id === highlightedTaskId}
                 />
@@ -865,6 +939,11 @@ export default function TasksView() {
   const [searchResults, setSearchResults] = useState<{ task: AnyTask; weekLabel: string }[]>([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null)
+
+  // Phase 5 state — detail panel
+  const [panelTask, setPanelTask] = useState<AnyTask | null>(null)
+  const [panelSection, setPanelSection] = useState<'notes' | 'comments'>('notes')
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Math.random().toString(36).slice(2)
@@ -997,6 +1076,22 @@ export default function TasksView() {
 
   const handleSearchClose = useCallback(() => {
     setShowSearchDropdown(false)
+  }, [])
+
+  const handleOpenPanel = useCallback((id: string, section: 'notes' | 'comments') => {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+    setPanelTask(task)
+    setPanelSection(section)
+    setPanelOpen(true)
+  }, [tasks])
+
+  const handleClosePanel = useCallback(() => {
+    setPanelOpen(false)
+  }, [])
+
+  const handleTogglePanel = useCallback(() => {
+    setPanelOpen((prev) => !prev)
   }, [])
 
   // ── CRUD handlers ──────────────────────────────────────────────────────────
@@ -1141,6 +1236,9 @@ export default function TasksView() {
         showSearchDropdown={showSearchDropdown}
         onSearchResultClick={handleSearchResultClick}
         onSearchClose={handleSearchClose}
+        panelOpen={panelOpen}
+        hasPanelTask={panelTask !== null}
+        onTogglePanel={handleTogglePanel}
       />
 
       <FilterBar
@@ -1168,6 +1266,7 @@ export default function TasksView() {
           onToggleFlag={handleToggleFlag}
           onMove={handleMove}
           onDelete={handleDeleteRequest}
+          onOpenPanel={handleOpenPanel}
           onAddTaskInWeek={(wi) => setAddModalWeekIndex(wi)}
           onReorder={handleReorder}
         />
@@ -1191,6 +1290,18 @@ export default function TasksView() {
       )}
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {panelTask && panelOpen && (
+        <DetailPanel
+          key={`${panelTask.id}-${panelSection}`}
+          taskId={panelTask.id}
+          taskDescription={panelTask.description}
+          taskProduct={panelTask.product}
+          taskProjectName={projectName(panelTask)}
+          initialSection={panelSection}
+          onClose={handleClosePanel}
+        />
+      )}
     </div>
   )
 }
