@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -35,6 +35,9 @@ const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 const USE_REAL_DATA = Boolean(ADMIN_USER_ID)
 
 type ViewMode = 'focused' | 'expanded'
+type SortMode = 'drag' | 'product' | 'project'
+
+const PRODUCT_ORDER: Record<string, number> = { AH: 0, EH: 1, NURO: 2 }
 
 // ─── Toasts ──────────────────────────────────────────────────────────────────
 
@@ -270,10 +273,11 @@ interface RowProps {
   onMove: (id: string, weeks: number) => void
   onDelete: (id: string) => void
   isDragMode: boolean
+  isHighlighted: boolean
 }
 
 function SortableTaskRow(props: RowProps) {
-  const { task, visibleWeekIndices, onToggleComplete, onToggleFlag, onMove, onDelete, isDragMode } = props
+  const { task, visibleWeekIndices, onToggleComplete, onToggleFlag, onMove, onDelete, isDragMode, isHighlighted } = props
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
   const taskWeekIndex = dateStringToWeekIndex(task.week_start_date)
   const bg = taskBg(task)
@@ -334,7 +338,7 @@ function SortableTaskRow(props: RowProps) {
             style={isTaskWeek ? bg : { backgroundColor: '#FFFFFF' }}
           >
             {isTaskWeek && (
-              <div className="flex items-center gap-2 min-w-0">
+              <div className={`flex items-center gap-2 min-w-0 rounded-[4px] transition-all ${isHighlighted ? 'ring-2 ring-[#38308F] ring-offset-1' : ''}`}>
                 {/* Checkbox */}
                 <button
                   onClick={() => onToggleComplete(task.id)}
@@ -403,6 +407,11 @@ function SortableTaskRow(props: RowProps) {
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
+interface SearchResult {
+  task: AnyTask
+  weekLabel: string
+}
+
 interface ToolbarProps {
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
@@ -412,6 +421,12 @@ interface ToolbarProps {
   onNext: () => void
   onToday: () => void
   onAddTask: () => void
+  searchQuery: string
+  onSearchChange: (q: string) => void
+  searchResults: SearchResult[]
+  showSearchDropdown: boolean
+  onSearchResultClick: (task: AnyTask) => void
+  onSearchClose: () => void
 }
 
 function Toolbar({
@@ -423,8 +438,25 @@ function Toolbar({
   onNext,
   onToday,
   onAddTask,
+  searchQuery,
+  onSearchChange,
+  searchResults,
+  showSearchDropdown,
+  onSearchResultClick,
+  onSearchClose,
 }: ToolbarProps) {
   const isAtCurrentWeek = centerWeekIndex === currentWeekIndex
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        onSearchClose()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onSearchClose])
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-[#DADADA] flex-shrink-0">
@@ -488,17 +520,126 @@ function Toolbar({
       </div>
 
       {/* Search */}
-      <div className="relative flex items-center">
+      <div ref={searchRef} className="relative flex items-center">
         <span className="absolute left-2.5 text-[#797979] pointer-events-none">
           <SearchIcon />
         </span>
         <input
           type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { onSearchClose(); (e.target as HTMLInputElement).blur() } }}
           placeholder="Search tasks…"
           className="pl-7 pr-3 py-1.5 text-[13px] border border-[#DADADA] rounded-[6px] w-48 placeholder:text-[#797979] focus:outline-none focus:border-[#38308F] bg-white"
-          disabled
-          title="Search (Phase 4)"
         />
+        {showSearchDropdown && searchResults.length > 0 && (
+          <div className="absolute top-full right-0 mt-1 z-40 bg-white border border-[#DADADA] rounded-[6px] shadow-lg w-80 py-1 overflow-hidden">
+            {searchResults.map(({ task, weekLabel }) => (
+              <button
+                key={task.id}
+                onMouseDown={(e) => { e.preventDefault(); onSearchResultClick(task) }}
+                className="w-full text-left px-3 py-2 hover:bg-[#F2F2F2] transition-colors flex flex-col gap-0.5"
+              >
+                <span className="text-[13px] text-[#19153F] truncate">{task.description}</span>
+                <div className="flex items-center gap-2">
+                  <ProductBadge product={task.product} />
+                  <span className="text-[11px] text-[#797979]">{projectName(task)}</span>
+                  <span className="text-[11px] text-[#797979] ml-auto">{weekLabel}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Filter bar ───────────────────────────────────────────────────────────────
+
+interface UniqueProject {
+  id: string
+  name: string
+}
+
+interface FilterBarProps {
+  uniqueProjects: UniqueProject[]
+  filterProducts: string[]
+  filterProjects: string[]
+  sortMode: SortMode
+  onToggleProduct: (p: string) => void
+  onToggleProject: (id: string) => void
+  onSortMode: (mode: SortMode) => void
+}
+
+const PRODUCT_LABELS: Record<string, string> = { AH: 'Access Hub', EH: 'Evidence Hub', NURO: 'NURO' }
+
+function FilterBar({
+  uniqueProjects,
+  filterProducts,
+  filterProjects,
+  sortMode,
+  onToggleProduct,
+  onToggleProject,
+  onSortMode,
+}: FilterBarProps) {
+  const chipBase = 'px-2.5 py-1 text-[12px] font-medium rounded-[4px] border transition-colors'
+  const chipActive = 'bg-[#19153F] text-white border-[#19153F]'
+  const chipInactive = 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F]'
+
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-[#DADADA] flex-shrink-0 flex-wrap">
+      {/* Product chips */}
+      {(['AH', 'EH', 'NURO'] as const).map((p) => {
+        const active = filterProducts.includes(p)
+        return (
+          <button
+            key={p}
+            onClick={() => onToggleProduct(p)}
+            className={`${chipBase} ${active ? chipActive : chipInactive}`}
+          >
+            {PRODUCT_LABELS[p]}
+          </button>
+        )
+      })}
+
+      {/* Divider */}
+      {uniqueProjects.length > 0 && (
+        <div className="w-px h-4 bg-[#DADADA] mx-0.5 flex-shrink-0" />
+      )}
+
+      {/* Project chips */}
+      {uniqueProjects.map((proj) => {
+        const active = filterProjects.includes(proj.id)
+        return (
+          <button
+            key={proj.id}
+            onClick={() => onToggleProject(proj.id)}
+            className={`${chipBase} ${active ? chipActive : chipInactive}`}
+          >
+            {proj.name}
+          </button>
+        )
+      })}
+
+      <div className="flex-1" />
+
+      {/* Sort mode */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-[11px] text-[#797979]">Sort:</span>
+        {([
+          ['drag', 'Drag & drop'],
+          ['product', 'By product'],
+          ['project', 'By project'],
+        ] as const).map(([mode, label]) => (
+          <button
+            key={mode}
+            onClick={() => onSortMode(mode)}
+            className={`${chipBase} ${sortMode === mode ? chipActive : chipInactive}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -510,6 +651,8 @@ interface TaskTableProps {
   tasks: AnyTask[]
   visibleWeekIndices: number[]
   currentWeekIndex: number
+  sortMode: SortMode
+  highlightedTaskId: string | null
   onToggleComplete: (id: string) => void
   onToggleFlag: (id: string) => void
   onMove: (id: string, weeks: number) => void
@@ -522,6 +665,8 @@ function TaskTable({
   tasks,
   visibleWeekIndices,
   currentWeekIndex,
+  sortMode,
+  highlightedTaskId,
   onToggleComplete,
   onToggleFlag,
   onMove,
@@ -542,6 +687,12 @@ function TaskTable({
       const wA = dateStringToWeekIndex(a.week_start_date)
       const wB = dateStringToWeekIndex(b.week_start_date)
       if (wA !== wB) return wA - wB
+      if (sortMode === 'product') {
+        return (PRODUCT_ORDER[a.product] ?? 99) - (PRODUCT_ORDER[b.product] ?? 99)
+      }
+      if (sortMode === 'project') {
+        return projectName(a).localeCompare(projectName(b))
+      }
       return a.sort_order - b.sort_order
     })
 
@@ -646,7 +797,8 @@ function TaskTable({
                   onToggleFlag={onToggleFlag}
                   onMove={onMove}
                   onDelete={onDelete}
-                  isDragMode={true}
+                  isDragMode={sortMode === 'drag'}
+                  isHighlighted={task.id === highlightedTaskId}
                 />
               ))}
             </SortableContext>
@@ -705,6 +857,15 @@ export default function TasksView() {
   const [deleting, setDeleting] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
 
+  // Phase 4 state
+  const [filterProducts, setFilterProducts] = useState<string[]>([])
+  const [filterProjects, setFilterProjects] = useState<string[]>([])
+  const [sortMode, setSortMode] = useState<SortMode>('drag')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ task: AnyTask; weekLabel: string }[]>([])
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null)
+
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { id, message, type }])
@@ -753,10 +914,90 @@ export default function TasksView() {
     loadData()
   }, [])
 
+  // Debounced search
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([])
+      setShowSearchDropdown(false)
+      return
+    }
+    const timer = setTimeout(() => {
+      const q = searchQuery.toLowerCase()
+      const results = tasks
+        .filter(
+          (t) =>
+            t.description.toLowerCase().includes(q) ||
+            t.product.toLowerCase().includes(q) ||
+            projectName(t).toLowerCase().includes(q)
+        )
+        .sort(
+          (a, b) =>
+            dateStringToWeekIndex(b.week_start_date) - dateStringToWeekIndex(a.week_start_date)
+        )
+        .slice(0, 8)
+        .map((task) => ({ task, weekLabel: formatWeekHeader(dateStringToWeekIndex(task.week_start_date)) }))
+      setSearchResults(results)
+      setShowSearchDropdown(results.length > 0)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, tasks])
+
+  // Unique projects derived from all tasks (works for both mock and real data)
+  const uniqueProjects = useMemo<{ id: string; name: string }[]>(() => {
+    const seen = new Map<string, string>()
+    tasks.forEach((t) => {
+      if (t.project_id && !seen.has(t.project_id)) {
+        seen.set(t.project_id, projectName(t))
+      }
+    })
+    return Array.from(seen.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [tasks])
+
   const visibleWeekIndices =
     viewMode === 'focused'
       ? [centerWeekIndex]
       : [centerWeekIndex - 1, centerWeekIndex, centerWeekIndex + 1].filter((w) => w >= 0)
+
+  // Apply product + project filters
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (filterProducts.length > 0 && !filterProducts.includes(t.product)) return false
+      if (filterProjects.length > 0 && !filterProjects.includes(t.project_id ?? '')) return false
+      return true
+    })
+  }, [tasks, filterProducts, filterProjects])
+
+  // ── Filter/sort handlers ───────────────────────────────────────────────────
+
+  const handleToggleProduct = useCallback((p: string) => {
+    setFilterProducts((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    )
+  }, [])
+
+  const handleToggleProject = useCallback((id: string) => {
+    setFilterProjects((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }, [])
+
+  const handleSearchResultClick = useCallback((task: AnyTask) => {
+    const weekIdx = dateStringToWeekIndex(task.week_start_date)
+    setCenterWeekIndex(weekIdx)
+    setHighlightedTaskId(task.id)
+    setSearchQuery('')
+    setShowSearchDropdown(false)
+    // Clear filters so the task is visible
+    setFilterProducts([])
+    setFilterProjects([])
+    setTimeout(() => setHighlightedTaskId(null), 2000)
+  }, [])
+
+  const handleSearchClose = useCallback(() => {
+    setShowSearchDropdown(false)
+  }, [])
 
   // ── CRUD handlers ──────────────────────────────────────────────────────────
 
@@ -894,6 +1135,22 @@ export default function TasksView() {
         onNext={() => setCenterWeekIndex((w) => w + 1)}
         onToday={() => setCenterWeekIndex(todayWeekIndex)}
         onAddTask={() => setAddModalWeekIndex(centerWeekIndex)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchResults={searchResults}
+        showSearchDropdown={showSearchDropdown}
+        onSearchResultClick={handleSearchResultClick}
+        onSearchClose={handleSearchClose}
+      />
+
+      <FilterBar
+        uniqueProjects={uniqueProjects}
+        filterProducts={filterProducts}
+        filterProjects={filterProjects}
+        sortMode={sortMode}
+        onToggleProduct={handleToggleProduct}
+        onToggleProject={handleToggleProject}
+        onSortMode={setSortMode}
       />
 
       {loading ? (
@@ -902,9 +1159,11 @@ export default function TasksView() {
         </div>
       ) : (
         <TaskTable
-          tasks={tasks}
+          tasks={filteredTasks}
           visibleWeekIndices={visibleWeekIndices}
           currentWeekIndex={todayWeekIndex}
+          sortMode={sortMode}
+          highlightedTaskId={highlightedTaskId}
           onToggleComplete={handleToggleComplete}
           onToggleFlag={handleToggleFlag}
           onMove={handleMove}
