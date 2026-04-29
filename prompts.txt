@@ -1,0 +1,24 @@
+
+#########################
+##### DEVELOPMENT PROMPTS
+
+Read SPEC.md and implement Phase 1.
+
+Read SPEC.md. Phase 2 is complete. Implement Phase 3.
+
+Read SPEC.md. We were partway through Phase 3. The following tasks are done: [list]. Continue from where we left off.
+
+If something was built differently than specced: Update SPEC.md to reflect the actual decision before starting the next phase.
+
+##### DEVELOPMENT
+
+It would be great to implement a download or export functionality inside a user's account or settings page. The idea is relatively simple: there should be a download or export button that allows users to export all of their data in the task tracker/list in CSV format. The CSV should be slightly reformatted to be in a more data-friendly format. That format would be a long format rather than a wide format. The first column could be the week, representing the week each task belongs to, and then a column for:
+- Product
+- Project
+- Task
+- Any task-related nodes
+- Any comments from your manager
+- Status indicating whether a task has been completed or not
+- Flag indicating whether a task is flagged for escalation or not
+
+Let me know if you have any suggestions or any questions that need clarifying. 
