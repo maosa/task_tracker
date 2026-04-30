@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import ProductBadge from './ProductBadge'
+import { X, Pencil, Trash2 } from 'lucide-react'
 
 const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 const USE_REAL_DATA = Boolean(ADMIN_USER_ID)
@@ -36,44 +37,6 @@ interface CommentRow {
   updated_at: string | null
   updated_by: string | null
   author_name?: string
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function PencilIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path
-        d="M8.5 1.5l2 2L3.5 10.5H1.5v-2L8.5 1.5z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function SmallTrashIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path
-        d="M1.5 3h9M4.5 3V2h3v1M4 3l.5 7M8 3l-.5 7"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }
 
 // ─── Comment item ─────────────────────────────────────────────────────────────
@@ -116,14 +79,14 @@ function CommentItem({
                 className="p-1 rounded text-[#797979] hover:text-[#19153F] hover:bg-[#F2F2F2] transition-colors"
                 title="Edit comment"
               >
-                <PencilIcon />
+                <Pencil size={12} />
               </button>
               <button
                 onClick={onDelete}
                 className="p-1 rounded text-[#797979] hover:text-[#FF0522] hover:bg-[#FFF0F2] transition-colors"
                 title="Delete comment"
               >
-                <SmallTrashIcon />
+                <Trash2 size={12} />
               </button>
             </div>
           )}
@@ -418,7 +381,7 @@ export default function DetailPanel({
             className="flex-shrink-0 p-1.5 rounded text-[#797979] hover:text-[#19153F] hover:bg-[#F2F2F2] transition-colors"
             title="Close panel"
           >
-            <CloseIcon />
+            <X size={14} />
           </button>
         </div>
 

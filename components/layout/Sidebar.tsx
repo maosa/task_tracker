@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { ListTodo, Users, Settings, ChevronRight, ChevronLeft } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 
 const STORAGE_KEY = 'sidebar_expanded'
+const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 
 interface NavItem {
   href: string
@@ -12,72 +15,44 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-function TaskListIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <rect x="2" y="4" width="12" height="1.5" rx="0.75" fill="currentColor" />
-      <rect x="2" y="8" width="12" height="1.5" rx="0.75" fill="currentColor" />
-      <rect x="2" y="12" width="8" height="1.5" rx="0.75" fill="currentColor" />
-      <rect x="15" y="3.5" width="3" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
-      <path d="M15.5 5l0.8 0.8 1.2-1.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function PeopleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="7.5" cy="6.5" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M2 15.5c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="14.5" cy="6.5" r="2" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M13 15.5c0-2.485 1.567-4.605 3.8-5.26" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M3.757 3.757l1.06 1.06M15.183 15.183l1.06 1.06M3.757 16.243l1.06-1.06M15.183 4.817l1.06-1.06"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ChevronLeftIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-interface SidebarProps {
-  hasManagerRelationships: boolean
-}
-
-export default function Sidebar({ hasManagerRelationships }: SidebarProps) {
+export default function Sidebar() {
   const [expanded, setExpanded] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [hasManagerRelationships, setHasManagerRelationships] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored !== null) setExpanded(stored === 'true')
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    async function checkManagerRelationships() {
+      if (!ADMIN_USER_ID) return
+
+      // Get current user's email for the OR check
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', ADMIN_USER_ID)
+        .single()
+      const currentUserEmail = currentUser?.email ?? null
+
+      const orClause = currentUserEmail
+        ? `manager_user_id.eq.${ADMIN_USER_ID},manager_email.eq.${currentUserEmail}`
+        : `manager_user_id.eq.${ADMIN_USER_ID}`
+
+      const { data } = await supabase
+        .from('manager_relationships')
+        .select('id')
+        .or(orClause)
+        .eq('status', 'accepted')
+        .limit(1)
+
+      setHasManagerRelationships(Array.isArray(data) && data.length > 0)
+    }
+    checkManagerRelationships()
   }, [])
 
   const toggle = () => {
@@ -89,9 +64,9 @@ export default function Sidebar({ hasManagerRelationships }: SidebarProps) {
   }
 
   const mainNavItems: NavItem[] = [
-    { href: '/tasks', label: 'My tasks', icon: <TaskListIcon /> },
+    { href: '/tasks', label: 'My tasks', icon: <ListTodo size={20} /> },
     ...(hasManagerRelationships
-      ? [{ href: '/manager', label: 'Manager view', icon: <PeopleIcon /> }]
+      ? [{ href: '/manager', label: 'Manager view', icon: <Users size={20} /> }]
       : []),
   ]
 
@@ -113,7 +88,7 @@ export default function Sidebar({ hasManagerRelationships }: SidebarProps) {
           aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
           title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
         >
-          {isExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+          {isExpanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
       </div>
 
@@ -139,7 +114,7 @@ export default function Sidebar({ hasManagerRelationships }: SidebarProps) {
       {/* Settings — pinned to bottom */}
       <div className="px-2 pb-4">
         <NavLink
-          item={{ href: '/settings', label: 'Settings', icon: <SettingsIcon /> }}
+          item={{ href: '/settings', label: 'Settings', icon: <Settings size={20} /> }}
           expanded={isExpanded}
           active={isActive('/settings')}
         />

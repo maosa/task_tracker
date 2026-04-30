@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Star, Search, UserRound, ArchiveX, ArchiveRestore } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 
-const STORAGE_KEY = 'manager_people'
+const PREFS_KEY = 'manager_card_prefs'
 const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,248 +21,26 @@ interface PersonCard {
   adminUserId: string
 }
 
+interface CardPrefs {
+  isFavorite: boolean
+  isArchived: boolean
+}
+
 type SortMode = 'name' | 'role' | 'favorites'
 type Tab = 'home' | 'archive'
-
-// ─── Seed data ────────────────────────────────────────────────────────────────
-
-function seedPeople(): PersonCard[] {
-  return [
-    {
-      id: 'seed-1',
-      firstName: 'Alex',
-      lastName: 'Chen',
-      email: 'alex.chen@accessinfinity.com',
-      role: 'Product Manager',
-      isFavorite: true,
-      isArchived: false,
-      adminUserId: ADMIN_USER_ID || 'demo-user',
-    },
-    {
-      id: 'seed-2',
-      firstName: 'Sam',
-      lastName: 'Williams',
-      email: 'sam.williams@accessinfinity.com',
-      role: 'Senior Engineer',
-      isFavorite: false,
-      isArchived: false,
-      adminUserId: 'demo-user-2',
-    },
-    {
-      id: 'seed-3',
-      firstName: 'Jordan',
-      lastName: 'Taylor',
-      email: 'jordan.taylor@accessinfinity.com',
-      role: 'UX Designer',
-      isFavorite: false,
-      isArchived: true,
-      adminUserId: 'demo-user-3',
-    },
-  ]
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function StarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M8 1.5l1.854 3.755L14 6.09l-3 2.922.708 4.13L8 11.135l-3.708 2.007L5 8.01 2 6.09l4.146-.835L8 1.5z"
-        stroke={filled ? '#FFD300' : 'currentColor'}
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-        fill={filled ? '#FFD300' : 'none'}
-      />
-    </svg>
-  )
-}
-
-function PencilIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-      <path
-        d="M9 1.5l2.5 2.5L4 11.5H1.5V9L9 1.5z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function PersonIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-      <circle cx="14" cy="10" r="5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4 24c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-// ─── Person modal (Add / Edit) ────────────────────────────────────────────────
-
-interface PersonModalProps {
-  initial: Partial<PersonCard>
-  onSave: (data: Omit<PersonCard, 'id' | 'isFavorite' | 'isArchived'>) => void
-  onDelete?: () => void
-  onCancel: () => void
-  mode: 'add' | 'edit'
-}
-
-function PersonModal({ initial, onSave, onDelete, onCancel, mode }: PersonModalProps) {
-  const [firstName, setFirstName] = useState(initial.firstName || '')
-  const [lastName, setLastName] = useState(initial.lastName || '')
-  const [email, setEmail] = useState(initial.email || '')
-  const [role, setRole] = useState(initial.role || '')
-  const [confirmDelete, setConfirmDelete] = useState(false)
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onCancel])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!firstName.trim() || !lastName.trim()) return
-    onSave({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      role: role.trim(),
-      adminUserId: initial.adminUserId || ADMIN_USER_ID || 'demo-user',
-    })
-  }
-
-  const inputClass =
-    'w-full px-3 py-2 text-[13px] border border-[#DADADA] rounded-[6px] focus:outline-none focus:border-[#38308F] bg-white text-[#19153F] placeholder:text-[#797979]'
-  const labelClass = 'block text-[12px] font-medium text-[#595959] mb-1'
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
-    >
-      <div className="bg-white rounded-[12px] shadow-xl w-full max-w-sm mx-4 p-6">
-        <h2 className="text-[15px] font-medium text-[#19153F] mb-5">
-          {mode === 'add' ? 'Add person' : 'Edit person'}
-        </h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>First name</label>
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                autoFocus
-                className={inputClass}
-                placeholder="First name"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Last name</label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                className={inputClass}
-                placeholder="Last name"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={labelClass}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
-              placeholder="email@example.com"
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Role</label>
-            <input
-              type="text"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. Product Manager"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            {mode === 'edit' && onDelete && !confirmDelete && (
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="px-3 py-2 text-[13px] font-medium text-[#FF0522] border border-[#DADADA] rounded-[6px] hover:border-[#FF0522] bg-white transition-colors"
-              >
-                Archive
-              </button>
-            )}
-            {confirmDelete && (
-              <button
-                type="button"
-                onClick={onDelete}
-                className="px-3 py-2 text-[13px] font-medium bg-[#FF0522] text-white rounded-[6px] hover:bg-[#cc0015] transition-colors"
-              >
-                Confirm archive
-              </button>
-            )}
-            <div className="flex-1" />
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-[13px] font-medium border border-[#DADADA] rounded-[6px] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] bg-white transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!firstName.trim() || !lastName.trim()}
-              className="px-4 py-2 text-[13px] font-medium bg-[#19153F] text-white rounded-[6px] border border-transparent hover:bg-[#2a2460] disabled:opacity-40 transition-colors"
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
 
 // ─── Person card ──────────────────────────────────────────────────────────────
 
 interface PersonCardProps {
   person: PersonCard
   onToggleFavorite: (id: string) => void
-  onEdit: (person: PersonCard) => void
+  onArchive: (id: string) => void
+  onUnarchive: (id: string) => void
   onClick: (person: PersonCard) => void
+  activeTab: Tab
 }
 
-function PersonCardItem({ person, onToggleFavorite, onEdit, onClick }: PersonCardProps) {
+function PersonCardItem({ person, onToggleFavorite, onArchive, onUnarchive, onClick, activeTab }: PersonCardProps) {
   const initials =
     (person.firstName[0] || '') + (person.lastName[0] || '')
 
@@ -277,17 +57,27 @@ function PersonCardItem({ person, onToggleFavorite, onEdit, onClick }: PersonCar
         }`}
         title={person.isFavorite ? 'Unpin' : 'Pin to top'}
       >
-        <StarIcon filled={person.isFavorite} />
+        <Star size={16} className={person.isFavorite ? 'text-[#FFD300] fill-[#FFD300]' : ''} />
       </button>
 
-      {/* Edit icon */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onEdit(person) }}
-        className="absolute top-3 right-3 p-1 rounded text-[#DADADA] hover:text-[#595959] hover:bg-[#F2F2F2] opacity-0 group-hover:opacity-100 transition-all"
-        title="Edit"
-      >
-        <PencilIcon />
-      </button>
+      {/* Archive / Unarchive button */}
+      {activeTab === 'home' ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onArchive(person.id) }}
+          className="absolute top-3 right-3 p-1 rounded text-[#DADADA] hover:text-[#595959] hover:bg-[#F2F2F2] opacity-0 group-hover:opacity-100 transition-all"
+          title="Archive"
+        >
+          <ArchiveX size={13} />
+        </button>
+      ) : (
+        <button
+          onClick={(e) => { e.stopPropagation(); onUnarchive(person.id) }}
+          className="absolute top-3 right-3 p-1 rounded text-[#DADADA] hover:text-[#595959] hover:bg-[#F2F2F2] opacity-0 group-hover:opacity-100 transition-all"
+          title="Unarchive"
+        >
+          <ArchiveRestore size={13} />
+        </button>
+      )}
 
       {/* Avatar */}
       <div className="flex flex-col items-center gap-3 pt-2">
@@ -312,67 +102,120 @@ function PersonCardItem({ person, onToggleFavorite, onEdit, onClick }: PersonCar
 export default function ManagerLandingView() {
   const router = useRouter()
   const [people, setPeople] = useState<PersonCard[]>([])
-  const [mounted, setMounted] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('home')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('favorites')
-  const [addModalOpen, setAddModalOpen] = useState(false)
-  const [editCard, setEditCard] = useState<PersonCard | null>(null)
 
-  // Load from localStorage, seed if empty
+  // ─── Load from Supabase on mount ─────────────────────────────────────────
+
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      try {
-        setPeople(JSON.parse(raw))
-      } catch {
-        setPeople(seedPeople())
-      }
-    } else {
-      const seeded = seedPeople()
-      setPeople(seeded)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
+    if (!ADMIN_USER_ID) {
+      setLoading(false)
+      return
     }
-    setMounted(true)
+
+    async function loadPeople() {
+      // 1. Fetch current user's email
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', ADMIN_USER_ID!)
+        .single()
+      const currentUserEmail = currentUser?.email ?? null
+
+      // 2. Fetch accepted relationships where current user is the manager
+      const orClause = currentUserEmail
+        ? `manager_user_id.eq.${ADMIN_USER_ID},manager_email.eq.${currentUserEmail}`
+        : `manager_user_id.eq.${ADMIN_USER_ID}`
+      const { data: relationships } = await supabase
+        .from('manager_relationships')
+        .select('*')
+        .or(orClause)
+        .eq('status', 'accepted')
+
+      if (!relationships || relationships.length === 0) {
+        setLoading(false)
+        return
+      }
+
+      // 3. Fetch user details for all admin_user_ids in those relationships
+      const adminUserIds: string[] = relationships.map((r: { admin_user_id: string }) => r.admin_user_id)
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, email, role')
+        .in('id', adminUserIds)
+
+      const usersMap = new Map<string, { id: string; first_name: string | null; last_name: string | null; email: string; role: string | null }>(
+        (users ?? []).map((u: { id: string; first_name: string | null; last_name: string | null; email: string; role: string | null }) => [u.id, u])
+      )
+
+      // 4. Load prefs from localStorage
+      let prefsMap: Record<string, CardPrefs> = {}
+      try {
+        const raw = localStorage.getItem(PREFS_KEY)
+        if (raw) prefsMap = JSON.parse(raw)
+      } catch {
+        // ignore
+      }
+
+      // 5. Build PersonCard[] from combined data
+      const cards: PersonCard[] = relationships.map((rel: { id: string; admin_user_id: string }) => {
+        const user = usersMap.get(rel.admin_user_id)
+        const prefs = prefsMap[rel.admin_user_id] ?? { isFavorite: false, isArchived: false }
+        return {
+          id: rel.id,
+          adminUserId: rel.admin_user_id,
+          firstName: user?.first_name ?? '',
+          lastName: user?.last_name ?? '',
+          email: user?.email ?? '',
+          role: user?.role ?? '',
+          isFavorite: prefs.isFavorite,
+          isArchived: prefs.isArchived,
+        }
+      })
+
+      setPeople(cards)
+      setLoading(false)
+    }
+
+    loadPeople()
   }, [])
 
-  const save = (next: PersonCard[]) => {
-    setPeople(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  // ─── Prefs helpers ────────────────────────────────────────────────────────
+
+  const savePrefs = (next: PersonCard[]) => {
+    const prefsMap: Record<string, CardPrefs> = {}
+    for (const p of next) {
+      prefsMap[p.adminUserId] = { isFavorite: p.isFavorite, isArchived: p.isArchived }
+    }
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefsMap))
   }
 
   const handleToggleFavorite = (id: string) => {
-    save(people.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)))
+    const next = people.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p))
+    setPeople(next)
+    savePrefs(next)
   }
 
-  const handleAdd = (data: Omit<PersonCard, 'id' | 'isFavorite' | 'isArchived'>) => {
-    const card: PersonCard = {
-      ...data,
-      id: Math.random().toString(36).slice(2),
-      isFavorite: false,
-      isArchived: false,
-    }
-    save([...people, card])
-    setAddModalOpen(false)
+  const handleArchiveCard = (id: string) => {
+    const next = people.map((p) => (p.id === id ? { ...p, isArchived: true, isFavorite: false } : p))
+    setPeople(next)
+    savePrefs(next)
   }
 
-  const handleEditSave = (data: Omit<PersonCard, 'id' | 'isFavorite' | 'isArchived'>) => {
-    if (!editCard) return
-    save(people.map((p) => (p.id === editCard.id ? { ...p, ...data } : p)))
-    setEditCard(null)
-  }
-
-  const handleArchive = () => {
-    if (!editCard) return
-    save(people.map((p) => (p.id === editCard.id ? { ...p, isArchived: true, isFavorite: false } : p)))
-    setEditCard(null)
+  const handleUnarchiveCard = (id: string) => {
+    const next = people.map((p) => (p.id === id ? { ...p, isArchived: false } : p))
+    setPeople(next)
+    savePrefs(next)
   }
 
   const handleCardClick = (person: PersonCard) => {
     router.push(`/manager/${person.adminUserId}`)
   }
 
-  // Filter and sort
+  // ─── Filter and sort ──────────────────────────────────────────────────────
+
   const q = searchQuery.toLowerCase()
   const filtered = people
     .filter((p) => p.isArchived === (activeTab === 'archive'))
@@ -395,7 +238,15 @@ export default function ManagerLandingView() {
   const chipActive = 'bg-[#19153F] text-white border-[#19153F]'
   const chipInactive = 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F]'
 
-  if (!mounted) return null
+  if (!ADMIN_USER_ID) {
+    return (
+      <div className="p-8">
+        <p className="text-[13px] text-[#797979]">
+          Set <code className="bg-[#F2F2F2] px-1 rounded text-[12px]">NEXT_PUBLIC_ADMIN_USER_ID</code> in your environment to use Manager view.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#F2F2F2]">
@@ -410,14 +261,14 @@ export default function ManagerLandingView() {
           {/* Search */}
           <div className="relative flex items-center">
             <span className="absolute left-2.5 text-[#797979] pointer-events-none">
-              <SearchIcon />
+              <Search size={14} />
             </span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search people…"
-              className="pl-7 pr-3 py-1.5 text-[13px] border border-[#DADADA] rounded-[6px] w-48 placeholder:text-[#797979] focus:outline-none focus:border-[#38308F] bg-white"
+              className="pl-7 pr-3 py-1 text-[13px] border border-[#DADADA] rounded-[6px] w-48 placeholder:text-[#797979] focus:outline-none focus:border-[#38308F] bg-white"
             />
           </div>
 
@@ -439,14 +290,6 @@ export default function ManagerLandingView() {
             ))}
           </div>
 
-          {/* Add person */}
-          <button
-            onClick={() => setAddModalOpen(true)}
-            className="flex items-center justify-center w-8 h-8 rounded-[6px] bg-[#19153F] text-white hover:bg-[#2a2460] transition-colors"
-            title="Add person"
-          >
-            <PlusIcon />
-          </button>
         </div>
 
         {/* Tabs */}
@@ -469,15 +312,19 @@ export default function ManagerLandingView() {
 
       {/* Cards grid */}
       <div className="flex-1 overflow-y-auto p-6">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-[13px] text-[#797979]">Loading…</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-[#797979]">
-            <PersonIcon />
+            <UserRound size={28} />
             <p className="text-[13px]">
               {activeTab === 'archive'
                 ? 'No archived people.'
                 : searchQuery
                 ? 'No results for your search.'
-                : 'No direct reports added yet. Click + to add someone.'}
+                : 'No direct reports yet. They will appear once a manager relationship is accepted.'}
             </p>
           </div>
         ) : (
@@ -487,34 +334,15 @@ export default function ManagerLandingView() {
                 key={person.id}
                 person={person}
                 onToggleFavorite={handleToggleFavorite}
-                onEdit={setEditCard}
+                onArchive={handleArchiveCard}
+                onUnarchive={handleUnarchiveCard}
                 onClick={handleCardClick}
+                activeTab={activeTab}
               />
             ))}
           </div>
         )}
       </div>
-
-      {/* Add modal */}
-      {addModalOpen && (
-        <PersonModal
-          initial={{}}
-          mode="add"
-          onSave={handleAdd}
-          onCancel={() => setAddModalOpen(false)}
-        />
-      )}
-
-      {/* Edit modal */}
-      {editCard && (
-        <PersonModal
-          initial={editCard}
-          mode="edit"
-          onSave={handleEditSave}
-          onDelete={handleArchive}
-          onCancel={() => setEditCard(null)}
-        />
-      )}
     </div>
   )
 }

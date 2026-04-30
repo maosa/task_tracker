@@ -490,7 +490,25 @@ Colors are drawn from Access Infinity's PowerPoint brand palette. The applicatio
 - **Toasts:** bottom-right, auto-dismiss after 3 seconds
 - **Detail panel:** 360px wide, slides in from right, sits above content with backdrop
 
-### 9.5 Responsive Behaviour
+### 9.5 Icons
+
+All icons throughout the application use **[Lucide React](https://lucide.dev)** (`lucide-react` package). No custom SVG icon functions should be added; always source from Lucide instead.
+
+| Context | Size | Notes |
+|---|---|---|
+| Sidebar navigation | `size={20}` | `ListTodo`, `Users`, `Settings` |
+| Sidebar collapse/expand chevrons | `size={16}` | `ChevronLeft`, `ChevronRight` |
+| Toolbar buttons (tasks & manager views) | `size={14}–size={16}` | `Plus`, `Search`, `ChevronLeft/Right`, `PanelRight` |
+| Task row action icons | `size={14}` | `Flag`, `ArrowRight`, `Trash2`, `FileText`, `MessageSquare` |
+| Drag handle | `size={12}` | `GripVertical` |
+| Detail panel | `size={12}–size={14}` | `X`, `Pencil`, `Trash2` |
+| Manager view cards | `size={13}–size={16}` | `Pencil`, `Star` |
+| Manager view empty state | `size={28}` | `UserRound` |
+| Settings view | `size={12}–size={13}` | `Pencil`, `Trash2`, `Check`, `X` |
+
+**Fill states:** Icons that toggle between filled and unfilled (e.g. flag, star) use Tailwind's `fill-` utility class directly on the Lucide component — e.g. `className="text-[#FF0522] fill-[#FF0522]"`. No separate filled/unfilled SVG variants are needed.
+
+### 9.6 Responsive Behaviour
 
 Primary target is desktop browser. Week columns have a minimum width of 200px and expand to fill available space. The two sticky columns (Product 110px, Project 130px) are always visible. On narrower screens, horizontal scrolling is enabled on the table only (not the full page).
 

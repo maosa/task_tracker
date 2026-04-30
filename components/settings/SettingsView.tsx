@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { DefaultLanding, ProjectRow } from '@/lib/supabase/types'
+import { Pencil, Trash2, Check, X } from 'lucide-react'
 
 const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 
@@ -13,6 +14,7 @@ interface UserRow {
   first_name: string | null
   last_name: string | null
   email: string
+  role: string | null
   default_landing: DefaultLanding
 }
 
@@ -50,38 +52,6 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
-
-function PencilIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-      <path d="M9 1.5l2.5 2.5L4 11.5H1.5V9L9 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-      <path d="M2 4h9M5 4V2.5h3V4M4.5 4l.5 7M8.5 4l-.5 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-      <path d="M2 7l3.5 3.5L11 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function XIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
 
 // ─── Confirm Dialog ───────────────────────────────────────────────────────────
 
@@ -141,6 +111,7 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [role, setRole] = useState('')
   const [defaultLanding, setDefaultLanding] = useState<DefaultLanding>('task_list')
   const [hasManagerRole, setHasManagerRole] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -160,6 +131,7 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
         setFirstName(userData.first_name ?? '')
         setLastName(userData.last_name ?? '')
         setEmail(userData.email ?? '')
+        setRole(userData.role ?? '')
         setDefaultLanding(userData.default_landing ?? 'task_list')
       }
       setHasManagerRole(Array.isArray(relData) && relData.length > 0)
@@ -176,6 +148,7 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
       first_name: firstName || null,
       last_name: lastName || null,
       email: email,
+      role: role || null,
       default_landing: defaultLanding,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' })
@@ -224,6 +197,16 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
           onChange={(e) => setEmail(e.target.value)}
           className="px-3 py-2 rounded-[6px] border border-[#DADADA] text-[13px] text-[#19153F] outline-none focus:border-[#19153F]"
           placeholder="you@example.com"
+        />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[12px] font-medium text-[#595959]">Current role</span>
+        <input
+          type="text"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="px-3 py-2 rounded-[6px] border border-[#DADADA] text-[13px] text-[#19153F] outline-none focus:border-[#19153F]"
+          placeholder="e.g. Product Manager"
         />
       </label>
 
@@ -424,14 +407,14 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
                       className="p-1.5 rounded-[4px] text-[#19153F] hover:bg-[#F2F2F2]"
                       title="Save"
                     >
-                      <CheckIcon />
+                      <Check size={13} />
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
                       className="p-1.5 rounded-[4px] text-[#797979] hover:bg-[#F2F2F2]"
                       title="Cancel"
                     >
-                      <XIcon />
+                      <X size={12} />
                     </button>
                   </>
                 ) : (
@@ -442,14 +425,14 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
                       className="p-1.5 rounded-[4px] text-[#797979] opacity-0 group-hover:opacity-100 hover:bg-[#F2F2F2] hover:text-[#19153F]"
                       title="Edit"
                     >
-                      <PencilIcon />
+                      <Pencil size={13} />
                     </button>
                     <button
                       onClick={() => initiateDelete(project)}
                       className="p-1.5 rounded-[4px] text-[#797979] opacity-0 group-hover:opacity-100 hover:bg-[#FFCDD3] hover:text-[#CC0015]"
                       title="Delete"
                     >
-                      <TrashIcon />
+                      <Trash2 size={13} />
                     </button>
                   </>
                 )}
@@ -544,20 +527,33 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
     }
 
     setSending(true)
+
+    // Look up manager's user_id by email (may be null if not registered)
+    const { data: managerUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
+    const managerUserId = managerUser?.id ?? null
+
+    const now = new Date().toISOString()
     const { error } = await supabase.from('manager_relationships').insert({
       admin_user_id: ADMIN_USER_ID,
       manager_email: email,
-      status: 'pending',
-      invited_at: new Date().toISOString(),
+      manager_user_id: managerUserId,
+      status: 'accepted',
+      invited_at: now,
+      accepted_at: now,
     })
     setSending(false)
 
     if (error) {
-      onToast('Failed to send invitation.', 'error')
+      onToast('Failed to add manager.', 'error')
     } else {
-      onToast('Invitation sent.')
+      onToast('Manager added.')
       setInviteEmail('')
       setValidation('idle')
+      loadManagers()
     }
   }
 
@@ -590,7 +586,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
-          <p className="text-[12px] font-medium text-[#595959]">Invite a manager</p>
+          <p className="text-[12px] font-medium text-[#595959]">Add your manager</p>
           <div className="flex gap-2">
             <div className="flex-1 flex flex-col gap-1">
               <input
@@ -603,10 +599,10 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
                 className="px-3 py-2 rounded-[6px] border border-[#DADADA] text-[13px] text-[#19153F] outline-none focus:border-[#19153F] placeholder:text-[#797979]"
               />
               {validation === 'found' && (
-                <p className="text-[12px] text-[#1B8C7A]">User found — invitation will be sent.</p>
+                <p className="text-[12px] text-[#1B8C7A]">✓ Registered user — relationship will be established immediately.</p>
               )}
               {validation === 'not_found' && (
-                <p className="text-[12px] text-[#B38600]">No account found for this email address.</p>
+                <p className="text-[12px] text-[#B38600]">User not found. You can still add this email — the relationship will activate once they register.</p>
               )}
             </div>
             <button
@@ -614,7 +610,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
               disabled={sending || !inviteEmail.trim()}
               className="self-start px-4 py-2 rounded-[6px] text-[13px] font-medium bg-[#19153F] text-white border border-transparent hover:bg-[#2e2870] disabled:opacity-50"
             >
-              {sending ? 'Sending…' : 'Send invitation'}
+              {sending ? 'Adding…' : 'Add manager'}
             </button>
           </div>
         </div>

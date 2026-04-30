@@ -31,6 +31,19 @@ import {
   formatWeekHeader,
   dateStringToWeekIndex,
 } from '@/lib/weeks'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+  Flag,
+  ArrowRight,
+  Trash2,
+  GripVertical,
+  FileText,
+  MessageSquare,
+  PanelRight,
+} from 'lucide-react'
 
 const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 const USE_REAL_DATA = Boolean(ADMIN_USER_ID)
@@ -70,116 +83,6 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
         </div>
       ))}
     </div>
-  )
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function ChevronLeftIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function FlagIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path
-        d="M2.5 1.5v11M2.5 1.5h7l-2 3.5 2 3.5H2.5"
-        stroke={filled ? '#FF0522' : 'currentColor'}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill={filled ? '#FF0522' : 'none'}
-      />
-    </svg>
-  )
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M2 3.5h10M5.5 3.5V2h3v1.5M5 3.5l.5 8M9 3.5l-.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function GripIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <circle cx="4" cy="3" r="1" fill="currentColor" />
-      <circle cx="8" cy="3" r="1" fill="currentColor" />
-      <circle cx="4" cy="6" r="1" fill="currentColor" />
-      <circle cx="8" cy="6" r="1" fill="currentColor" />
-      <circle cx="4" cy="9" r="1" fill="currentColor" />
-      <circle cx="8" cy="9" r="1" fill="currentColor" />
-    </svg>
-  )
-}
-
-function NoteIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M4.5 5h5M4.5 7h5M4.5 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function CommentIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path
-        d="M2 2.5h10a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H8l-2 2-2-2H2a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function PanelIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9 2v10" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
   )
 }
 
@@ -332,11 +235,10 @@ function SortableTaskRow(props: RowProps) {
   }
 
   return (
-    <tr ref={setNodeRef} style={{ ...style, ...bg }} className="group">
+    <tr ref={setNodeRef} style={style} className="group">
       {/* Product — sticky, with drag handle */}
       <td
-        className="sticky left-0 z-10 border-b border-r border-[#DADADA] px-3 py-2.5"
-        style={{ ...bg }}
+        className="sticky left-0 z-10 border-b border-r border-[#DADADA] px-3 py-2.5 bg-white"
       >
         <div className="flex items-center gap-1.5">
           {isDragMode && (
@@ -346,7 +248,7 @@ function SortableTaskRow(props: RowProps) {
               className="opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing text-[#595959] flex-shrink-0"
               title="Drag to reorder"
             >
-              <GripIcon />
+              <GripVertical size={12} />
             </span>
           )}
           <ProductBadge product={task.product} />
@@ -356,7 +258,7 @@ function SortableTaskRow(props: RowProps) {
       {/* Project — sticky */}
       <td
         className="sticky z-10 border-b border-r border-[#DADADA] px-3 py-2.5 text-[13px] text-[#595959] whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]"
-        style={{ left: 110, ...bg, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
+        style={{ left: 110, backgroundColor: '#FFFFFF', boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
       >
         {projectName(task)}
       </td>
@@ -400,7 +302,7 @@ function SortableTaskRow(props: RowProps) {
                     className="p-1 rounded text-[#797979] hover:text-[#FF0522] hover:bg-[#FFF0F2] transition-colors"
                     title={task.is_flagged ? 'Unflag' : 'Flag for manager'}
                   >
-                    <FlagIcon filled={task.is_flagged} />
+                    <Flag size={14} className={task.is_flagged ? 'text-[#FF0522] fill-[#FF0522]' : ''} />
                   </button>
 
                   {/* Move */}
@@ -410,7 +312,7 @@ function SortableTaskRow(props: RowProps) {
                       className="p-1 rounded text-[#797979] hover:text-[#19153F] hover:bg-[#F2F2F2] transition-colors"
                       title="Move to future week"
                     >
-                      <ArrowRightIcon />
+                      <ArrowRight size={14} />
                     </button>
                     {showMoveDropdown && (
                       <MoveDropdown
@@ -426,7 +328,7 @@ function SortableTaskRow(props: RowProps) {
                     className="p-1 rounded text-[#797979] hover:text-[#38308F] hover:bg-[#F2F2F2] transition-colors"
                     title="View notes"
                   >
-                    <NoteIcon />
+                    <FileText size={14} />
                   </button>
 
                   {/* Comment */}
@@ -435,7 +337,7 @@ function SortableTaskRow(props: RowProps) {
                     className="p-1 rounded text-[#797979] hover:text-[#38308F] hover:bg-[#F2F2F2] transition-colors"
                     title="View comments"
                   >
-                    <CommentIcon />
+                    <MessageSquare size={14} />
                   </button>
 
                   {/* Delete */}
@@ -444,7 +346,7 @@ function SortableTaskRow(props: RowProps) {
                     className="p-1 rounded text-[#797979] hover:text-[#FF0522] hover:bg-[#FFF0F2] transition-colors"
                     title="Delete task"
                   >
-                    <TrashIcon />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>
@@ -520,9 +422,9 @@ function Toolbar({
       {/* Add task */}
       <button
         onClick={onAddTask}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#19153F] text-white text-[13px] font-medium rounded-[6px] border border-transparent hover:bg-[#2a2460] transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1 bg-[#19153F] text-white text-[13px] font-medium rounded-[6px] border border-transparent hover:bg-[#2a2460] transition-colors"
       >
-        <PlusIcon />
+        <Plus size={14} />
         Add task
       </button>
 
@@ -536,7 +438,7 @@ function Toolbar({
           className="flex items-center justify-center w-7 h-7 rounded border border-[#DADADA] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-white"
           aria-label="Previous week"
         >
-          <ChevronLeftIcon />
+          <ChevronLeft size={16} />
         </button>
 
         <button
@@ -555,7 +457,7 @@ function Toolbar({
           className="flex items-center justify-center w-7 h-7 rounded border border-[#DADADA] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] transition-colors bg-white"
           aria-label="Next week"
         >
-          <ChevronRightIcon />
+          <ChevronRight size={16} />
         </button>
       </div>
 
@@ -587,13 +489,13 @@ function Toolbar({
             : 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F] disabled:opacity-30 disabled:cursor-not-allowed'
         }`}
       >
-        <PanelIcon />
+        <PanelRight size={14} />
       </button>
 
       {/* Search */}
       <div ref={searchRef} className="relative flex items-center">
         <span className="absolute left-2.5 text-[#797979] pointer-events-none">
-          <SearchIcon />
+          <Search size={14} />
         </span>
         <input
           type="text"
@@ -601,7 +503,7 @@ function Toolbar({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Escape') { onSearchClose(); (e.target as HTMLInputElement).blur() } }}
           placeholder="Search tasks…"
-          className="pl-7 pr-3 py-1.5 text-[13px] border border-[#DADADA] rounded-[6px] w-48 placeholder:text-[#797979] focus:outline-none focus:border-[#38308F] bg-white"
+          className="pl-7 pr-3 py-1 text-[13px] border border-[#DADADA] rounded-[6px] w-48 placeholder:text-[#797979] focus:outline-none focus:border-[#38308F] bg-white"
         />
         {showSearchDropdown && searchResults.length > 0 && (
           <div className="absolute top-full right-0 mt-1 z-40 bg-white border border-[#DADADA] rounded-[6px] shadow-lg w-80 py-1 overflow-hidden">

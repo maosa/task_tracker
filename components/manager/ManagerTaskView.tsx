@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase/client'
 import { MOCK_TASKS } from '@/lib/mock-data'
 import type { MockTask } from '@/lib/mock-data'
 import type { TaskWithProject } from '@/lib/supabase/types'
+import { ChevronLeft, ChevronRight, Search, PanelRight, FileText, MessageSquare, ArrowLeft } from 'lucide-react'
 import {
   getCurrentWeekIndex,
   weekIndexToDateString,
@@ -40,69 +41,6 @@ function projectName(t: AnyTask): string {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-function ChevronLeftIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function PanelIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9 2v10" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  )
-}
-
-function NoteIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M4.5 5h5M4.5 7h5M4.5 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function CommentIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path
-        d="M2 2.5h10a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H8l-2 2-2-2H2a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function BackIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 // ─── Read-only task row ───────────────────────────────────────────────────────
 
@@ -173,14 +111,14 @@ function ReadOnlyTaskRow({ task, visibleWeekIndices, onOpenPanel, isHighlighted 
                     className="p-1 rounded text-[#797979] hover:text-[#38308F] hover:bg-[#F2F2F2] transition-colors"
                     title="View notes"
                   >
-                    <NoteIcon />
+                    <FileText size={14} />
                   </button>
                   <button
                     onClick={() => onOpenPanel(task.id, 'comments')}
                     className="p-1 rounded text-[#797979] hover:text-[#38308F] hover:bg-[#F2F2F2] transition-colors"
                     title="View comments"
                   >
-                    <CommentIcon />
+                    <MessageSquare size={14} />
                   </button>
                 </div>
               </div>
@@ -253,7 +191,7 @@ function Toolbar({
         href="/manager"
         className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium border border-[#DADADA] rounded-[6px] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] bg-white transition-colors"
       >
-        <BackIcon />
+        <ArrowLeft size={14} />
         Back
       </Link>
 
@@ -277,7 +215,7 @@ function Toolbar({
           className="flex items-center justify-center w-7 h-7 rounded border border-[#DADADA] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-white"
           aria-label="Previous week"
         >
-          <ChevronLeftIcon />
+          <ChevronLeft size={16} />
         </button>
         <button
           onClick={onToday}
@@ -294,7 +232,7 @@ function Toolbar({
           className="flex items-center justify-center w-7 h-7 rounded border border-[#DADADA] text-[#595959] hover:border-[#aaa] hover:text-[#19153F] transition-colors bg-white"
           aria-label="Next week"
         >
-          <ChevronRightIcon />
+          <ChevronRight size={16} />
         </button>
       </div>
 
@@ -324,13 +262,13 @@ function Toolbar({
             : 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F] disabled:opacity-30 disabled:cursor-not-allowed'
         }`}
       >
-        <PanelIcon />
+        <PanelRight size={14} />
       </button>
 
       {/* Search */}
       <div ref={searchRef} className="relative flex items-center">
         <span className="absolute left-2.5 text-[#797979] pointer-events-none">
-          <SearchIcon />
+          <Search size={14} />
         </span>
         <input
           type="text"
