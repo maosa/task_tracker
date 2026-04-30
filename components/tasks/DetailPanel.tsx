@@ -171,6 +171,7 @@ export interface DetailPanelProps {
   taskProjectName: string | null
   initialSection: 'notes' | 'comments'
   onClose: () => void
+  readOnlyNotes?: boolean
 }
 
 export default function DetailPanel({
@@ -180,6 +181,7 @@ export default function DetailPanel({
   taskProjectName,
   initialSection,
   onClose,
+  readOnlyNotes = false,
 }: DetailPanelProps) {
   // Slide-in animation
   const [visible, setVisible] = useState(false)
@@ -434,6 +436,12 @@ export default function DetailPanel({
             </div>
             {noteLoading ? (
               <p className="text-[13px] text-[#797979]">Loading…</p>
+            ) : readOnlyNotes ? (
+              noteContent ? (
+                <p className="text-[13px] text-[#595959] whitespace-pre-wrap break-words">{noteContent}</p>
+              ) : (
+                <p className="text-[13px] text-[#797979] italic">No notes added.</p>
+              )
             ) : (
               <textarea
                 value={noteContent}

@@ -1,8 +1,8 @@
 import Sidebar from '@/components/layout/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 
-// In Phase 1 this is hardcoded. Phase 7 will read from the user's accepted manager_relationships.
-const HAS_MANAGER_RELATIONSHIPS = false
+// Phase 7: enabled so sidebar shows Manager view. Full auth mode will read from manager_relationships.
+const HAS_MANAGER_RELATIONSHIPS = true
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
