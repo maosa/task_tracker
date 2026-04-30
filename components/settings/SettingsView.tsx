@@ -136,7 +136,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 // ─── Account Section ──────────────────────────────────────────────────────────
 
-function AccountSection({ onToast }: { onToast: (msg: string, type: 'success' | 'error') => void }) {
+function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [user, setUser] = useState<UserRow | null>(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -276,7 +276,7 @@ function AccountSection({ onToast }: { onToast: (msg: string, type: 'success' | 
 
 // ─── Projects Section ─────────────────────────────────────────────────────────
 
-function ProjectsSection({ onToast }: { onToast: (msg: string, type: 'success' | 'error') => void }) {
+function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
@@ -487,7 +487,7 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type: 'success' |
 
 type ValidationState = 'idle' | 'found' | 'not_found'
 
-function ManagerSection({ onToast }: { onToast: (msg: string, type: 'success' | 'error') => void }) {
+function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [validation, setValidation] = useState<ValidationState>('idle')
   const [sending, setSending] = useState(false)
