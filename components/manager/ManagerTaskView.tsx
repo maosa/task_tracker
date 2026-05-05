@@ -56,13 +56,13 @@ function ReadOnlyTaskRow({ task, visibleWeekIndices, onOpenPanel, isHighlighted 
   return (
     <tr style={bg} className="group">
       {/* Product — sticky */}
-      <td className="sticky left-0 z-10 border-b border-r border-[#DADADA] px-3 py-2.5" style={bg}>
+      <td className="sticky left-0 z-10 border-t border-r border-[#DADADA] px-3 py-2.5" style={bg}>
         <ProductBadge product={task.product} />
       </td>
 
       {/* Project — sticky */}
       <td
-        className="sticky z-10 border-b border-r border-[#DADADA] px-3 py-2.5 text-[13px] text-[#595959] whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]"
+        className="sticky z-10 border-t border-r border-[#DADADA] px-3 py-2.5 text-[13px] text-[#595959] whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]"
         style={{ left: 110, ...bg, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
       >
         {projectName(task)}
@@ -384,7 +384,7 @@ function TaskTable({ tasks, visibleWeekIndices, currentWeekIndex, sortMode, high
 
   return (
     <div className="overflow-x-auto flex-1">
-      <table className="border-collapse" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
+      <table className="border-separate border-spacing-0" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: 110, minWidth: 110 }} />
           <col style={{ width: 130, minWidth: 130 }} />
@@ -392,11 +392,11 @@ function TaskTable({ tasks, visibleWeekIndices, currentWeekIndex, sortMode, high
         </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide">
+            <th className="sticky left-0 z-20 bg-[#F2F2F2] border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide">
               Product
             </th>
             <th
-              className="sticky z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
+              className="sticky z-20 bg-[#F2F2F2] border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
               style={{ left: 110, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
             >
               Project
