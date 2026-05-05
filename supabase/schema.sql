@@ -85,10 +85,10 @@ create table if not exists public.tasks (
   status         text not null default 'open' check (status in ('open', 'complete')),
   is_flagged     boolean not null default false,
   sort_order     integer not null default 0,
-  created_by     uuid not null references public.users(id),
+  created_by     uuid not null references public.users(id) on delete cascade,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz,
-  updated_by     uuid references public.users(id)
+  updated_by     uuid references public.users(id) on delete set null
 );
 
 create index if not exists tasks_admin_user_id_idx    on public.tasks(admin_user_id);
@@ -103,10 +103,10 @@ create table if not exists public.task_notes (
   id          uuid primary key default uuid_generate_v4(),
   task_id     uuid not null references public.tasks(id) on delete cascade,
   content     text not null,
-  created_by  uuid not null references public.users(id),
+  created_by  uuid not null references public.users(id) on delete cascade,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz,
-  updated_by  uuid references public.users(id),
+  updated_by  uuid references public.users(id) on delete set null,
   unique (task_id)
 );
 
@@ -118,10 +118,10 @@ create table if not exists public.task_comments (
   id          uuid primary key default uuid_generate_v4(),
   task_id     uuid not null references public.tasks(id) on delete cascade,
   content     text not null,
-  created_by  uuid not null references public.users(id),
+  created_by  uuid not null references public.users(id) on delete cascade,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz,
-  updated_by  uuid references public.users(id)
+  updated_by  uuid references public.users(id) on delete set null
 );
 
 create index if not exists task_comments_task_id_idx on public.task_comments(task_id);
