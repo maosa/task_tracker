@@ -280,7 +280,7 @@ interface SortableProjectRowProps {
   project: ProjectRow
   editingId: string | null
   editName: string
-  editInputRef: React.RefObject<HTMLInputElement>
+  editInputRef: React.RefObject<HTMLInputElement | null>
   onEditStart: (project: ProjectRow) => void
   onEditNameChange: (name: string) => void
   onEditSave: (id: string) => void
