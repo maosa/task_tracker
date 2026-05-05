@@ -9,6 +9,7 @@ export default function SignupPage() {
   const router = useRouter()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [role, setRole] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -35,10 +36,10 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      // Trigger auto-creates the users row; update it with the name fields
+      // Trigger auto-creates the users row; update it with the name and role fields
       await supabase
         .from('users')
-        .update({ first_name: firstName, last_name: lastName })
+        .update({ first_name: firstName, last_name: lastName, role: role || null })
         .eq('id', data.user.id)
 
       if (!data.session) {
@@ -91,6 +92,17 @@ export default function SignupPage() {
                 placeholder="Maos"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[12px] font-medium text-[#595959] mb-1">Current role</label>
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full h-9 px-3 text-[13px] border border-[#DADADA] rounded-md focus:outline-none focus:border-[#38308F] text-[#19153F]"
+              placeholder="e.g. Product Manager"
+            />
           </div>
 
           <div>
