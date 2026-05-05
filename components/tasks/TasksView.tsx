@@ -749,7 +749,7 @@ function TaskTable({
       onDragEnd={handleDragEnd}
     >
       <div className="overflow-y-auto flex-1">
-        <table className="border-collapse" style={{ width: '100%', tableLayout: 'fixed' }}>
+        <table className="border-separate border-spacing-0" style={{ width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 110, minWidth: 110 }} />
             <col style={{ width: 130, minWidth: 130 }} />
