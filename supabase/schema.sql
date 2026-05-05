@@ -22,12 +22,21 @@ create table if not exists public.users (
   updated_at    timestamptz
 );
 
--- Auto-insert a users row when a new auth.users record is created
+-- Auto-insert a users row when a new auth.users record is created.
+-- first_name, last_name, and role are read from raw_user_meta_data so they
+-- are persisted even when email confirmation is required (no session yet).
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into public.users (id, email, created_at)
-  values (new.id, new.email, now())
+  insert into public.users (id, email, first_name, last_name, role, created_at)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'first_name',
+    new.raw_user_meta_data->>'last_name',
+    new.raw_user_meta_data->>'role',
+    now()
+  )
   on conflict (id) do nothing;
   return new;
 end;

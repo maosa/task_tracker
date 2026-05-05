@@ -26,7 +26,7 @@ export default function SignupPage() {
       password,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
-        data: { first_name: firstName, last_name: lastName },
+        data: { first_name: firstName, last_name: lastName, role: role || null },
       },
     })
 
@@ -45,12 +45,6 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      // Trigger auto-creates the users row; update it with the name and role fields
-      await supabase
-        .from('users')
-        .update({ first_name: firstName, last_name: lastName, role: role || null })
-        .eq('id', data.user.id)
-
       if (!data.session) {
         setConfirmMessage('confirm')
         setLoading(false)
