@@ -732,7 +732,7 @@ function TaskTable({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="overflow-x-auto flex-1">
+      <div className="overflow-auto flex-1">
         <table className="border-collapse" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 110, minWidth: 110 }} />
@@ -746,12 +746,12 @@ function TaskTable({
           <thead>
             <tr>
               <th
-                className="sticky left-0 z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
+                className="sticky left-0 top-0 z-30 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
               >
                 Product
               </th>
               <th
-                className="sticky z-20 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
+                className="sticky top-0 z-30 bg-[#F2F2F2] border-b border-r border-[#DADADA] px-3 py-2 text-left text-[11px] font-medium text-[#797979] uppercase tracking-wide"
                 style={{ left: 110, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)' }}
               >
                 Project
@@ -761,7 +761,7 @@ function TaskTable({
                 return (
                   <th
                     key={wi}
-                    className="border-b border-r border-[#DADADA] px-3 py-2 text-left text-[13px] font-medium text-[#19153F] bg-[#F2F2F2]"
+                    className="sticky top-0 z-20 border-b border-r border-[#DADADA] px-3 py-2 text-left text-[13px] font-medium text-[#19153F] bg-[#F2F2F2]"
                   >
                     <div className="flex items-center gap-2">
                       <span className={isCurrent ? 'pb-0.5 border-b-2 border-[#00D1BA]' : ''}>
