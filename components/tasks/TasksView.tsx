@@ -282,11 +282,11 @@ function SortableTaskRow(props: RowProps) {
             style={isTaskWeek ? bg : { backgroundColor: '#FFFFFF' }}
           >
             {isTaskWeek && (
-              <div className={`flex items-center gap-2 min-w-0 rounded-[4px] transition-all ${isHighlighted ? 'ring-2 ring-[#38308F] ring-offset-1' : ''}`}>
+              <div className={`flex items-start gap-2 min-w-0 rounded-[4px] transition-all ${isHighlighted ? 'ring-2 ring-[#38308F] ring-offset-1' : ''}`}>
                 {/* Checkbox */}
                 <button
                   onClick={() => onToggleComplete(task.id)}
-                  className={`flex-shrink-0 w-[15px] h-[15px] rounded-[3px] border flex items-center justify-center transition-colors ${
+                  className={`mt-0.5 flex-shrink-0 w-[15px] h-[15px] rounded-[3px] border flex items-center justify-center transition-colors ${
                     task.status === 'complete'
                       ? 'bg-[#00D1BA] border-[#00D1BA]'
                       : 'border-[#DADADA] hover:border-[#00D1BA] bg-white'
@@ -301,10 +301,10 @@ function SortableTaskRow(props: RowProps) {
                 </button>
 
                 {/* Description */}
-                <span className={`flex-1 min-w-0 truncate ${dc}`}>{task.description}</span>
+                <span className={`flex-1 min-w-0 break-words ${dc}`}>{task.description}</span>
 
                 {/* Row actions — on hover */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity relative">
+                <div className="mt-0.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity relative">
                   {/* Flag */}
                   <button
                     onClick={() => onToggleFlag(task.id)}
@@ -748,13 +748,13 @@ function TaskTable({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="overflow-auto flex-1">
-        <table className="border-collapse" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
+      <div className="overflow-y-auto flex-1">
+        <table className="border-collapse" style={{ width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 110, minWidth: 110 }} />
             <col style={{ width: 130, minWidth: 130 }} />
             {visibleWeekIndices.map((wi) => (
-              <col key={wi} style={{ minWidth: 200 }} />
+              <col key={wi} />
             ))}
           </colgroup>
 
