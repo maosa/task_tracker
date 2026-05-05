@@ -42,6 +42,7 @@ import {
   FileText,
   MessageSquare,
   PanelRight,
+  X,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 
@@ -572,6 +573,7 @@ interface FilterBarProps {
   onToggleProduct: (p: string) => void
   onToggleProject: (id: string) => void
   onSortMode: (mode: SortMode) => void
+  onClearFilters: () => void
 }
 
 const PRODUCT_LABELS: Record<string, string> = { AH: 'Access Hub', EH: 'Evidence Hub', NURO: 'NURO' }
@@ -584,7 +586,9 @@ function FilterBar({
   onToggleProduct,
   onToggleProject,
   onSortMode,
+  onClearFilters,
 }: FilterBarProps) {
+  const hasActiveFilters = filterProducts.length > 0 || filterProjects.length > 0
   const chipBase = 'px-2.5 py-1 text-[12px] font-medium rounded-[4px] border transition-colors'
   const chipActive = 'bg-[#19153F] text-white border-[#19153F]'
   const chipInactive = 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F]'
@@ -623,6 +627,18 @@ function FilterBar({
           </button>
         )
       })}
+
+      {/* Clear filters */}
+      {hasActiveFilters && (
+        <button
+          onClick={onClearFilters}
+          className="flex items-center gap-1 px-2 py-1 text-[12px] font-medium text-[#797979] hover:text-[#CC0015] transition-colors"
+          title="Clear all filters"
+        >
+          <X size={12} />
+          Clear
+        </button>
+      )}
 
       <div className="flex-1" />
 
@@ -994,6 +1010,11 @@ export default function TasksView() {
     )
   }, [])
 
+  const handleClearFilters = useCallback(() => {
+    setFilterProducts([])
+    setFilterProjects([])
+  }, [])
+
   const handleSearchResultClick = useCallback((task: AnyTask) => {
     const weekIdx = dateStringToWeekIndex(task.week_start_date)
     setCenterWeekIndex(weekIdx)
@@ -1176,6 +1197,7 @@ export default function TasksView() {
         onToggleProduct={handleToggleProduct}
         onToggleProject={handleToggleProject}
         onSortMode={setSortMode}
+        onClearFilters={handleClearFilters}
       />
 
       {loading ? (
