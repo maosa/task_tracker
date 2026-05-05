@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Star, Search, UserRound, ArchiveX, ArchiveRestore } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth-context'
 
 const PREFS_KEY = 'manager_card_prefs'
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +100,7 @@ function PersonCardItem({ person, onToggleFavorite, onArchive, onUnarchive, onCl
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function ManagerLandingView() {
+  const { userId } = useAuth()
   const router = useRouter()
   const [people, setPeople] = useState<PersonCard[]>([])
   const [loading, setLoading] = useState(true)
@@ -110,28 +111,17 @@ export default function ManagerLandingView() {
   // ─── Load from Supabase on mount ─────────────────────────────────────────
 
   useEffect(() => {
-    if (!ADMIN_USER_ID) {
+    if (!userId) {
       setLoading(false)
       return
     }
 
     async function loadPeople() {
-      // 1. Fetch current user's email
-      const { data: currentUser } = await supabase
-        .from('users')
-        .select('email')
-        .eq('id', ADMIN_USER_ID!)
-        .single()
-      const currentUserEmail = currentUser?.email ?? null
-
-      // 2. Fetch accepted relationships where current user is the manager
-      const orClause = currentUserEmail
-        ? `manager_user_id.eq.${ADMIN_USER_ID},manager_email.eq.${currentUserEmail}`
-        : `manager_user_id.eq.${ADMIN_USER_ID}`
+      // Fetch accepted relationships where current user is the manager
       const { data: relationships } = await supabase
         .from('manager_relationships')
         .select('*')
-        .or(orClause)
+        .eq('manager_user_id', userId)
         .eq('status', 'accepted')
 
       if (!relationships || relationships.length === 0) {
@@ -180,7 +170,7 @@ export default function ManagerLandingView() {
     }
 
     loadPeople()
-  }, [])
+  }, [userId])
 
   // ─── Prefs helpers ────────────────────────────────────────────────────────
 
@@ -237,16 +227,6 @@ export default function ManagerLandingView() {
   const chipBase = 'px-2.5 py-1 text-[12px] font-medium rounded-[4px] border transition-colors'
   const chipActive = 'bg-[#19153F] text-white border-[#19153F]'
   const chipInactive = 'bg-white text-[#595959] border-[#DADADA] hover:border-[#aaa] hover:text-[#19153F]'
-
-  if (!ADMIN_USER_ID) {
-    return (
-      <div className="p-8">
-        <p className="text-[13px] text-[#797979]">
-          Set <code className="bg-[#F2F2F2] px-1 rounded text-[12px]">NEXT_PUBLIC_ADMIN_USER_ID</code> in your environment to use Manager view.
-        </p>
-      </div>
-    )
-  }
 
   return (
     <div className="flex flex-col h-full bg-[#F2F2F2]">

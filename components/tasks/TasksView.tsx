@@ -44,9 +44,7 @@ import {
   MessageSquare,
   PanelRight,
 } from 'lucide-react'
-
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
-const USE_REAL_DATA = Boolean(ADMIN_USER_ID)
+import { useAuth } from '@/lib/auth-context'
 
 type ViewMode = 'focused' | 'expanded'
 type SortMode = 'drag' | 'product' | 'project'
@@ -820,13 +818,15 @@ function TaskTable({
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function TasksView() {
+  const { userId } = useAuth()
+  const USE_REAL_DATA = Boolean(userId)
   const todayWeekIndex = getCurrentWeekIndex()
   const [viewMode, setViewMode] = useState<ViewMode>('focused')
   const [centerWeekIndex, setCenterWeekIndex] = useState(todayWeekIndex)
 
   const [tasks, setTasks] = useState<AnyTask[]>([])
   const [projects, setProjects] = useState<ProjectRow[]>([])
-  const [loading, setLoading] = useState(USE_REAL_DATA)
+  const [loading, setLoading] = useState(true)
 
   const [addModalWeekIndex, setAddModalWeekIndex] = useState<number | null>(null)
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
@@ -859,8 +859,9 @@ export default function TasksView() {
 
   // Fetch tasks and projects
   useEffect(() => {
-    if (!USE_REAL_DATA) {
+    if (!userId) {
       setTasks(MOCK_TASKS)
+      setLoading(false)
       return
     }
     const loadData = async () => {
@@ -869,13 +870,13 @@ export default function TasksView() {
         supabase
           .from('tasks')
           .select('*, projects(name)')
-          .eq('admin_user_id', ADMIN_USER_ID!)
+          .eq('admin_user_id', userId)
           .order('week_start_date')
           .order('sort_order'),
         supabase
           .from('projects')
           .select('*')
-          .eq('admin_user_id', ADMIN_USER_ID!)
+          .eq('admin_user_id', userId)
           .is('deleted_at', null)
           .order('name'),
       ])
@@ -893,7 +894,7 @@ export default function TasksView() {
       setLoading(false)
     }
     loadData()
-  }, [])
+  }, [userId])
 
   // Debounced search
   useEffect(() => {
@@ -1010,7 +1011,7 @@ export default function TasksView() {
     const newStatus = task.status === 'complete' ? 'open' : 'complete'
     const { error } = await supabase
       .from('tasks')
-      .update({ status: newStatus, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+      .update({ status: newStatus, updated_at: new Date().toISOString(), updated_by: userId })
       .eq('id', id)
     if (error) {
       addToast('Failed to update task.', 'error')
@@ -1018,7 +1019,7 @@ export default function TasksView() {
         prev.map((t) => (t.id === id ? { ...t, status: task.status } : t))
       )
     }
-  }, [tasks, addToast])
+  }, [tasks, addToast, userId])
 
   const handleToggleFlag = useCallback(async (id: string) => {
     setTasks((prev) =>
@@ -1029,7 +1030,7 @@ export default function TasksView() {
     if (!task) return
     const { error } = await supabase
       .from('tasks')
-      .update({ is_flagged: !task.is_flagged, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+      .update({ is_flagged: !task.is_flagged, updated_at: new Date().toISOString(), updated_by: userId })
       .eq('id', id)
     if (error) {
       addToast('Failed to update task.', 'error')
@@ -1037,7 +1038,7 @@ export default function TasksView() {
         prev.map((t) => (t.id === id ? { ...t, is_flagged: task.is_flagged } : t))
       )
     }
-  }, [tasks, addToast])
+  }, [tasks, addToast, userId])
 
   const handleMove = useCallback(async (id: string, weeks: number) => {
     const task = tasks.find((t) => t.id === id)
@@ -1054,7 +1055,7 @@ export default function TasksView() {
     if (!USE_REAL_DATA) return
     const { error } = await supabase
       .from('tasks')
-      .update({ week_start_date: newDate, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+      .update({ week_start_date: newDate, updated_at: new Date().toISOString(), updated_by: userId })
       .eq('id', id)
     if (error) {
       addToast('Failed to move task.', 'error')
@@ -1062,7 +1063,7 @@ export default function TasksView() {
         prev.map((t) => (t.id === id ? { ...t, week_start_date: task.week_start_date } : t))
       )
     }
-  }, [tasks, addToast])
+  }, [tasks, addToast, userId])
 
   const handleDeleteRequest = useCallback((id: string) => {
     setDeleteTaskId(id)
@@ -1106,11 +1107,11 @@ export default function TasksView() {
       orderedIds.map((id, idx) =>
         supabase
           .from('tasks')
-          .update({ sort_order: idx, updated_at: new Date().toISOString(), updated_by: ADMIN_USER_ID })
+          .update({ sort_order: idx, updated_at: new Date().toISOString(), updated_by: userId })
           .eq('id', id)
       )
     )
-  }, [])
+  }, [userId])
 
   const handleTaskCreated = useCallback((task: TaskWithProject) => {
     setTasks((prev) => {

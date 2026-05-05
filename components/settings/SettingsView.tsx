@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { DefaultLanding, ProjectRow } from '@/lib/supabase/types'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
-
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
+import { useAuth } from '@/lib/auth-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +106,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 // ─── Account Section ──────────────────────────────────────────────────────────
 
 function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const { userId } = useAuth()
   const [user, setUser] = useState<UserRow | null>(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -119,11 +119,11 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 
   useEffect(() => {
     async function load() {
-      if (!ADMIN_USER_ID) return
+      if (!userId) return
 
       const [{ data: userData }, { data: relData }] = await Promise.all([
-        supabase.from('users').select('*').eq('id', ADMIN_USER_ID).single(),
-        supabase.from('manager_relationships').select('id').eq('manager_user_id', ADMIN_USER_ID).eq('status', 'accepted').limit(1),
+        supabase.from('users').select('*').eq('id', userId).single(),
+        supabase.from('manager_relationships').select('id').eq('manager_user_id', userId).eq('status', 'accepted').limit(1),
       ])
 
       if (userData) {
@@ -141,10 +141,10 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
   }, [])
 
   const handleSave = async () => {
-    if (!ADMIN_USER_ID) return
+    if (!userId) return
     setSaving(true)
     const { error } = await supabase.from('users').upsert({
-      id: ADMIN_USER_ID,
+      id: userId,
       first_name: firstName || null,
       last_name: lastName || null,
       email: email,
@@ -260,6 +260,7 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 // ─── Projects Section ─────────────────────────────────────────────────────────
 
 function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const { userId } = useAuth()
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
@@ -283,11 +284,11 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
   }, [editingId])
 
   async function loadProjects() {
-    if (!ADMIN_USER_ID) { setLoading(false); return }
+    if (!userId) { setLoading(false); return }
     const { data } = await supabase
       .from('projects')
       .select('*')
-      .eq('admin_user_id', ADMIN_USER_ID)
+      .eq('admin_user_id', userId)
       .is('deleted_at', null)
       .order('name', { ascending: true })
     setProjects((data as ProjectRow[]) ?? [])
@@ -305,7 +306,7 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
     setAddError('')
     const { data, error } = await supabase
       .from('projects')
-      .insert({ admin_user_id: ADMIN_USER_ID!, name, created_at: new Date().toISOString() })
+      .insert({ admin_user_id: userId!, name, created_at: new Date().toISOString() })
       .select()
       .single()
     setAdding(false)
@@ -471,6 +472,7 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
 type ValidationState = 'idle' | 'found' | 'not_found'
 
 function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const { userId } = useAuth()
   const [inviteEmail, setInviteEmail] = useState('')
   const [validation, setValidation] = useState<ValidationState>('idle')
   const [sending, setSending] = useState(false)
@@ -484,11 +486,11 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
   }, [])
 
   async function loadManagers() {
-    if (!ADMIN_USER_ID) { setLoadingManagers(false); return }
+    if (!userId) { setLoadingManagers(false); return }
     const { data } = await supabase
       .from('manager_relationships')
       .select('*')
-      .eq('admin_user_id', ADMIN_USER_ID)
+      .eq('admin_user_id', userId)
       .eq('status', 'accepted')
       .order('accepted_at', { ascending: false })
     setManagers((data as ManagerRelRow[]) ?? [])
@@ -518,7 +520,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 
   const handleSendInvitation = async () => {
     const email = inviteEmail.trim()
-    if (!email || !ADMIN_USER_ID) return
+    if (!email || !userId) return
 
     const existing = managers.find((m) => m.manager_email.toLowerCase() === email.toLowerCase())
     if (existing) {
@@ -538,7 +540,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 
     const now = new Date().toISOString()
     const { error } = await supabase.from('manager_relationships').insert({
-      admin_user_id: ADMIN_USER_ID,
+      admin_user_id: userId,
       manager_email: email,
       manager_user_id: managerUserId,
       status: 'accepted',
@@ -663,16 +665,6 @@ export default function SettingsView() {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
-
-  if (!ADMIN_USER_ID) {
-    return (
-      <div className="p-8">
-        <p className="text-[13px] text-[#797979]">
-          Set <code className="bg-[#F2F2F2] px-1 rounded text-[12px]">NEXT_PUBLIC_ADMIN_USER_ID</code> in your environment to use Settings.
-        </p>
-      </div>
-    )
-  }
 
   return (
     <div className="p-6 max-w-2xl flex flex-col gap-5">

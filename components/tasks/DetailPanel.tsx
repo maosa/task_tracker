@@ -4,9 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import ProductBadge from './ProductBadge'
 import { X, Pencil, Trash2 } from 'lucide-react'
-
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
-const USE_REAL_DATA = Boolean(ADMIN_USER_ID)
+import { useAuth } from '@/lib/auth-context'
 
 function formatTimestamp(ts: string | null | undefined): string {
   if (!ts) return ''
@@ -146,6 +144,9 @@ export default function DetailPanel({
   onClose,
   readOnlyNotes = false,
 }: DetailPanelProps) {
+  const { userId } = useAuth()
+  const USE_REAL_DATA = Boolean(userId)
+
   // Slide-in animation
   const [visible, setVisible] = useState(false)
   useEffect(() => {
@@ -233,7 +234,7 @@ export default function DetailPanel({
         setComments(
           data.map((c) => ({
             ...c,
-            author_name: c.created_by === ADMIN_USER_ID ? 'You' : (nameMap[c.created_by] || 'Unknown'),
+            author_name: c.created_by === userId ? 'You' : (nameMap[c.created_by] || 'Unknown'),
           }))
         )
       }
@@ -261,7 +262,7 @@ export default function DetailPanel({
     if (note) {
       const { data, error } = await supabase
         .from('task_notes')
-        .update({ content: noteContent, updated_at: now, updated_by: ADMIN_USER_ID })
+        .update({ content: noteContent, updated_at: now, updated_by: userId })
         .eq('id', note.id)
         .select()
         .single()
@@ -272,7 +273,7 @@ export default function DetailPanel({
     } else {
       const { data, error } = await supabase
         .from('task_notes')
-        .insert({ task_id: taskId, content: noteContent, created_by: ADMIN_USER_ID! })
+        .insert({ task_id: taskId, content: noteContent, created_by: userId! })
         .select()
         .single()
       if (!error && data) {
@@ -303,7 +304,7 @@ export default function DetailPanel({
     setAddingComment(true)
     const { data, error } = await supabase
       .from('task_comments')
-      .insert({ task_id: taskId, content: newComment.trim(), created_by: ADMIN_USER_ID! })
+      .insert({ task_id: taskId, content: newComment.trim(), created_by: userId! })
       .select()
       .single()
     if (!error && data) {
@@ -330,7 +331,7 @@ export default function DetailPanel({
       const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('task_comments')
-        .update({ content: editContent.trim(), updated_at: now, updated_by: ADMIN_USER_ID })
+        .update({ content: editContent.trim(), updated_at: now, updated_by: userId })
         .eq('id', commentId)
         .select()
         .single()

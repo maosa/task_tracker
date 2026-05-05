@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Product, ProjectRow, TaskWithProject } from '@/lib/supabase/types'
 import { supabase } from '@/lib/supabase/client'
 import { formatWeekHeader, weekIndexToDateString } from '@/lib/weeks'
-
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
+import { useAuth } from '@/lib/auth-context'
 
 const PRODUCTS: { value: Product; label: string }[] = [
   { value: 'AH', label: 'Access Hub (AH)' },
@@ -21,6 +20,7 @@ interface Props {
 }
 
 export default function AddTaskModal({ weekIndex, projects, onClose, onCreated }: Props) {
+  const { userId } = useAuth()
   const [product, setProduct] = useState<Product | ''>('')
   const [projectId, setProjectId] = useState('')
   const [description, setDescription] = useState('')
@@ -36,14 +36,14 @@ export default function AddTaskModal({ weekIndex, projects, onClose, onCreated }
   const weekDateStr = weekIndexToDateString(weekIndex)
 
   const fetchSuggestions = useCallback(async (query: string, prod: Product | '') => {
-    if (!ADMIN_USER_ID || query.length < 2) {
+    if (!userId || query.length < 2) {
       setSuggestions([])
       return
     }
     let q = supabase
       .from('tasks')
       .select('description')
-      .eq('admin_user_id', ADMIN_USER_ID)
+      .eq('admin_user_id', userId)
       .ilike('description', `%${query}%`)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -53,7 +53,7 @@ export default function AddTaskModal({ weekIndex, projects, onClose, onCreated }
       const unique = [...new Set(data.map((r) => r.description))].slice(0, 5)
       setSuggestions(unique)
     }
-  }, [])
+  }, [userId])
 
   const handleDescriptionChange = (val: string) => {
     setDescription(val)
@@ -99,13 +99,13 @@ export default function AddTaskModal({ weekIndex, projects, onClose, onCreated }
     if (!product) { setError('Please select a product.'); return }
     if (!projectId) { setError('Please select a project.'); return }
     if (!description.trim()) { setError('Please enter a description.'); return }
-    if (!ADMIN_USER_ID) { setError('NEXT_PUBLIC_ADMIN_USER_ID is not configured.'); return }
+    if (!userId) { setError('Not signed in.'); return }
 
     setSaving(true)
     const { data, error: dbErr } = await supabase
       .from('tasks')
       .insert({
-        admin_user_id: ADMIN_USER_ID,
+        admin_user_id: userId,
         product: product as Product,
         project_id: projectId || null,
         description: description.trim(),
@@ -113,7 +113,7 @@ export default function AddTaskModal({ weekIndex, projects, onClose, onCreated }
         status: 'open',
         is_flagged: false,
         sort_order: 9999,
-        created_by: ADMIN_USER_ID,
+        created_by: userId,
       })
       .select('*, projects(name)')
       .single()

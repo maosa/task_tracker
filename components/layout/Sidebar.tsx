@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ListTodo, Users, Settings, ChevronRight, ChevronLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth-context'
 
 const STORAGE_KEY = 'sidebar_expanded'
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID
 
 interface NavItem {
   href: string
@@ -16,6 +16,7 @@ interface NavItem {
 }
 
 export default function Sidebar() {
+  const { userId } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [hasManagerRelationships, setHasManagerRelationships] = useState(false)
@@ -28,32 +29,17 @@ export default function Sidebar() {
   }, [])
 
   useEffect(() => {
-    async function checkManagerRelationships() {
-      if (!ADMIN_USER_ID) return
-
-      // Get current user's email for the OR check
-      const { data: currentUser } = await supabase
-        .from('users')
-        .select('email')
-        .eq('id', ADMIN_USER_ID)
-        .single()
-      const currentUserEmail = currentUser?.email ?? null
-
-      const orClause = currentUserEmail
-        ? `manager_user_id.eq.${ADMIN_USER_ID},manager_email.eq.${currentUserEmail}`
-        : `manager_user_id.eq.${ADMIN_USER_ID}`
-
-      const { data } = await supabase
-        .from('manager_relationships')
-        .select('id')
-        .or(orClause)
-        .eq('status', 'accepted')
-        .limit(1)
-
-      setHasManagerRelationships(Array.isArray(data) && data.length > 0)
-    }
-    checkManagerRelationships()
-  }, [])
+    if (!userId) return
+    supabase
+      .from('manager_relationships')
+      .select('id')
+      .eq('manager_user_id', userId)
+      .eq('status', 'accepted')
+      .limit(1)
+      .then(({ data }) => {
+        setHasManagerRelationships(Array.isArray(data) && data.length > 0)
+      })
+  }, [userId])
 
   const toggle = () => {
     setExpanded((prev) => {
