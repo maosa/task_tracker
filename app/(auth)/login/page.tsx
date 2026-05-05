@@ -42,7 +42,7 @@ export default function LoginPage() {
     <div className="w-full max-w-sm bg-white rounded-xl border border-[#DADADA] p-8 shadow-sm">
       <div className="mb-6">
         <h1 className="text-[18px] font-medium text-[#19153F]">Sign in</h1>
-        <p className="text-[13px] text-[#595959] mt-1">Task Tracker — Access Infinity</p>
+        <p className="text-[13px] text-[#595959] mt-1">Task Tracker</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

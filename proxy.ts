@@ -32,6 +32,8 @@ export async function proxy(request: NextRequest) {
   if (
     pathname === '/login' ||
     pathname === '/signup' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon')
   ) {
