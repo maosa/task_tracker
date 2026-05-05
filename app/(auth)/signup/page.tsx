@@ -25,12 +25,21 @@ export default function SignupPage() {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/login`,
         data: { first_name: firstName, last_name: lastName },
       },
     })
 
     if (authError) {
       setError(authError.message)
+      setLoading(false)
+      return
+    }
+
+    // identities is empty when the email is already registered (confirmed or not).
+    // Supabase does not send a new confirmation email in this case.
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setError('An account with this email already exists. Please sign in instead.')
       setLoading(false)
       return
     }
