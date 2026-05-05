@@ -759,7 +759,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
           ) : (
             <div className="flex flex-col divide-y divide-[#F2F2F2]">
               {managers.map((m) => (
-                <div key={m.id} className="flex items-center justify-between py-2.5 group">
+                <div key={m.id} className="flex items-center justify-between py-2.5">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[13px] text-[#19153F]">{m.manager_email}</span>
                     {m.accepted_at && (
@@ -770,7 +770,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
                   </div>
                   <button
                     onClick={() => setRemoveTarget(m)}
-                    className="px-3 py-1.5 rounded-[6px] text-[12px] font-medium text-[#797979] border border-[#DADADA] bg-white hover:border-[#FF0522] hover:text-[#CC0015] opacity-0 group-hover:opacity-100"
+                    className="px-3 py-1.5 rounded-[6px] text-[12px] font-medium text-[#797979] border border-[#DADADA] bg-white hover:border-[#FF0522] hover:text-[#CC0015]"
                   >
                     Remove
                   </button>
@@ -808,7 +808,7 @@ export default function SettingsView() {
       <SectionCard title="Projects">
         <ProjectsSection onToast={addToast} />
       </SectionCard>
-      <SectionCard title="Manager invitation">
+      <SectionCard title="Manager relationships">
         <ManagerSection onToast={addToast} />
       </SectionCard>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
