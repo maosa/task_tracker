@@ -37,6 +37,7 @@ import {
   Plus,
   Search,
   Flag,
+  ArrowLeft,
   ArrowRight,
   Trash2,
   GripVertical,
@@ -154,17 +155,28 @@ function DeleteConfirmModal({
 
 // ─── Move dropdown ────────────────────────────────────────────────────────────
 
-const MOVE_OPTIONS = [
+const MOVE_FORWARD_OPTIONS = [
   { label: 'Next week (+1)', weeks: 1 },
   { label: '+2 weeks', weeks: 2 },
   { label: '+3 weeks', weeks: 3 },
   { label: '+4 weeks', weeks: 4 },
 ]
 
+const MOVE_BACK_OPTIONS = [
+  { label: 'Previous week (−1)', weeks: -1 },
+  { label: '−2 weeks', weeks: -2 },
+  { label: '−3 weeks', weeks: -3 },
+  { label: '−4 weeks', weeks: -4 },
+]
+
 function MoveDropdown({
+  options,
+  align = 'right',
   onMove,
   onClose,
 }: {
+  options: { label: string; weeks: number }[]
+  align?: 'left' | 'right'
   onMove: (weeks: number) => void
   onClose: () => void
 }) {
@@ -181,9 +193,9 @@ function MoveDropdown({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#DADADA] rounded-[6px] shadow-md min-w-[150px] py-1 overflow-hidden"
+      className={`absolute top-full mt-1 z-30 bg-white border border-[#DADADA] rounded-[6px] shadow-md min-w-[170px] py-1 overflow-hidden ${align === 'right' ? 'right-0' : 'left-0'}`}
     >
-      {MOVE_OPTIONS.map((opt) => (
+      {options.map((opt) => (
         <button
           key={opt.weeks}
           onClick={() => { onMove(opt.weeks); onClose() }}
@@ -213,6 +225,7 @@ interface RowProps {
 function SortableTaskRow(props: RowProps) {
   const { task, visibleWeekIndices, onToggleComplete, onToggleFlag, onMove, onDelete, onOpenPanel, isDragMode, isHighlighted } = props
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
+  const [showMoveBackDropdown, setShowMoveBackDropdown] = useState(false)
   const taskWeekIndex = dateStringToWeekIndex(task.week_start_date)
   const bg = taskBg(task)
   const dc = descClass(task)
@@ -303,17 +316,38 @@ function SortableTaskRow(props: RowProps) {
                     <Flag size={14} className={task.is_flagged ? 'text-[#FF0522] fill-[#FF0522]' : ''} />
                   </button>
 
-                  {/* Move */}
+                  {/* Move back */}
                   <div className="relative">
                     <button
-                      onClick={() => setShowMoveDropdown((v) => !v)}
+                      onClick={() => { setShowMoveBackDropdown((v) => !v); setShowMoveDropdown(false) }}
                       className="p-1 rounded text-[#797979] hover:text-[#19153F] hover:bg-[#F2F2F2] transition-colors"
-                      title="Move to future week"
+                      title="Move to a previous week"
+                    >
+                      <ArrowLeft size={14} />
+                    </button>
+                    {showMoveBackDropdown && (
+                      <MoveDropdown
+                        options={MOVE_BACK_OPTIONS}
+                        align="left"
+                        onMove={(weeks) => onMove(task.id, weeks)}
+                        onClose={() => setShowMoveBackDropdown(false)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Move forward */}
+                  <div className="relative">
+                    <button
+                      onClick={() => { setShowMoveDropdown((v) => !v); setShowMoveBackDropdown(false) }}
+                      className="p-1 rounded text-[#797979] hover:text-[#19153F] hover:bg-[#F2F2F2] transition-colors"
+                      title="Move to a future week"
                     >
                       <ArrowRight size={14} />
                     </button>
                     {showMoveDropdown && (
                       <MoveDropdown
+                        options={MOVE_FORWARD_OPTIONS}
+                        align="right"
                         onMove={(weeks) => onMove(task.id, weeks)}
                         onClose={() => setShowMoveDropdown(false)}
                       />
@@ -1044,7 +1078,8 @@ export default function TasksView() {
     const task = tasks.find((t) => t.id === id)
     if (!task) return
     const oldIndex = dateStringToWeekIndex(task.week_start_date)
-    const newIndex = oldIndex + weeks
+    const newIndex = Math.max(0, oldIndex + weeks)
+    if (newIndex === oldIndex) return
     const newDate = weekIndexToDateString(newIndex)
 
     setTasks((prev) =>
