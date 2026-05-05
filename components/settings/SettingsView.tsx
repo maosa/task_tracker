@@ -3,8 +3,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { DefaultLanding, ProjectRow } from '@/lib/supabase/types'
-import { Pencil, Trash2, Check, X } from 'lucide-react'
+import { GripVertical, Pencil, Trash2, Check, X } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -259,6 +276,114 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 
 // ─── Projects Section ─────────────────────────────────────────────────────────
 
+interface SortableProjectRowProps {
+  project: ProjectRow
+  editingId: string | null
+  editName: string
+  editInputRef: React.RefObject<HTMLInputElement>
+  onEditStart: (project: ProjectRow) => void
+  onEditNameChange: (name: string) => void
+  onEditSave: (id: string) => void
+  onEditCancel: () => void
+  onDelete: (project: ProjectRow) => void
+}
+
+function SortableProjectRow({
+  project,
+  editingId,
+  editName,
+  editInputRef,
+  onEditStart,
+  onEditNameChange,
+  onEditSave,
+  onEditCancel,
+  onDelete,
+}: SortableProjectRowProps) {
+  const isEditing = editingId === project.id
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project.id, disabled: isEditing })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 py-2.5 group border-b border-[#F2F2F2] last:border-b-0"
+    >
+      {/* Drag handle — hidden in edit mode */}
+      <span
+        {...(isEditing ? {} : { ...attributes, ...listeners })}
+        className={`flex-shrink-0 text-[#DADADA] transition-colors ${
+          isEditing
+            ? 'invisible'
+            : 'cursor-grab active:cursor-grabbing group-hover:text-[#797979]'
+        }`}
+      >
+        <GripVertical size={14} />
+      </span>
+
+      {isEditing ? (
+        <>
+          <input
+            ref={editInputRef}
+            type="text"
+            value={editName}
+            onChange={(e) => onEditNameChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onEditSave(project.id)
+              if (e.key === 'Escape') onEditCancel()
+            }}
+            className="flex-1 px-2.5 py-1.5 rounded-[6px] border border-[#19153F] text-[13px] text-[#19153F] outline-none"
+          />
+          <button
+            onClick={() => onEditSave(project.id)}
+            className="p-1.5 rounded-[4px] text-[#19153F] hover:bg-[#F2F2F2]"
+            title="Save"
+          >
+            <Check size={13} />
+          </button>
+          <button
+            onClick={onEditCancel}
+            className="p-1.5 rounded-[4px] text-[#797979] hover:bg-[#F2F2F2]"
+            title="Cancel"
+          >
+            <X size={12} />
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="flex-1 text-[13px] text-[#19153F]">{project.name}</span>
+          <button
+            onClick={() => onEditStart(project)}
+            className="p-1.5 rounded-[4px] text-[#797979] opacity-0 group-hover:opacity-100 hover:bg-[#F2F2F2] hover:text-[#19153F]"
+            title="Edit"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={() => onDelete(project)}
+            className="p-1.5 rounded-[4px] text-[#797979] opacity-0 group-hover:opacity-100 hover:bg-[#FFCDD3] hover:text-[#CC0015]"
+            title="Delete"
+          >
+            <Trash2 size={13} />
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' | 'error') => void }) {
   const { userId } = useAuth()
   const [projects, setProjects] = useState<ProjectRow[]>([])
@@ -271,6 +396,11 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
   const [deleteTarget, setDeleteTarget] = useState<ProjectRow | null>(null)
   const [deleteTaskCount, setDeleteTaskCount] = useState(0)
   const editInputRef = useRef<HTMLInputElement>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   useEffect(() => {
     loadProjects()
@@ -290,7 +420,7 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
       .select('*')
       .eq('admin_user_id', userId)
       .is('deleted_at', null)
-      .order('name', { ascending: true })
+      .order('sort_order', { ascending: true })
     setProjects((data as ProjectRow[]) ?? [])
     setLoading(false)
   }
@@ -304,16 +434,23 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
     }
     setAdding(true)
     setAddError('')
+    const nextOrder = projects.length
     const { data, error } = await supabase
       .from('projects')
-      .insert({ admin_user_id: userId!, name, created_at: new Date().toISOString() })
+      .insert({
+        admin_user_id: userId!,
+        name,
+        sort_order: nextOrder,
+        created_at: new Date().toISOString(),
+      })
       .select()
       .single()
     setAdding(false)
     if (error || !data) {
       onToast('Failed to add project.', 'error')
     } else {
-      setProjects((prev) => [...prev, data as ProjectRow].sort((a, b) => a.name.localeCompare(b.name)))
+      // Append at end — preserve user's custom order
+      setProjects((prev) => [...prev, data as ProjectRow])
       setNewName('')
       onToast('Project added.')
     }
@@ -333,12 +470,33 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
     if (error) {
       onToast('Failed to save project.', 'error')
     } else {
-      setProjects((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, name } : p)).sort((a, b) => a.name.localeCompare(b.name))
-      )
+      // Keep current position — only the name changes
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)))
       onToast('Project saved.')
     }
     setEditingId(null)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = projects.findIndex((p) => p.id === active.id)
+    const newIndex = projects.findIndex((p) => p.id === over.id)
+    const reordered = arrayMove(projects, oldIndex, newIndex)
+
+    // Optimistic update
+    setProjects(reordered)
+
+    // Persist new sort_order for every project
+    await Promise.all(
+      reordered.map((p, idx) =>
+        supabase
+          .from('projects')
+          .update({ sort_order: idx, updated_at: new Date().toISOString() })
+          .eq('id', p.id),
+      ),
+    )
   }
 
   const initiateDelete = async (project: ProjectRow) => {
@@ -359,7 +517,8 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
     if (error) {
       onToast('Failed to delete project.', 'error')
     } else {
-      setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      const remaining = projects.filter((p) => p.id !== deleteTarget.id)
+      setProjects(remaining)
       onToast('Project deleted.')
     }
     setDeleteTarget(null)
@@ -387,59 +546,33 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
         ) : projects.length === 0 ? (
           <p className="text-[13px] text-[#797979]">No projects yet. Add one below.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-[#F2F2F2]">
-            {projects.map((project) => (
-              <div key={project.id} className="flex items-center gap-2 py-2.5 group">
-                {editingId === project.id ? (
-                  <>
-                    <input
-                      ref={editInputRef}
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleEditSave(project.id)
-                        if (e.key === 'Escape') setEditingId(null)
-                      }}
-                      className="flex-1 px-2.5 py-1.5 rounded-[6px] border border-[#19153F] text-[13px] text-[#19153F] outline-none"
-                    />
-                    <button
-                      onClick={() => handleEditSave(project.id)}
-                      className="p-1.5 rounded-[4px] text-[#19153F] hover:bg-[#F2F2F2]"
-                      title="Save"
-                    >
-                      <Check size={13} />
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="p-1.5 rounded-[4px] text-[#797979] hover:bg-[#F2F2F2]"
-                      title="Cancel"
-                    >
-                      <X size={12} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex-1 text-[13px] text-[#19153F]">{project.name}</span>
-                    <button
-                      onClick={() => { setEditingId(project.id); setEditName(project.name) }}
-                      className="p-1.5 rounded-[4px] text-[#797979] opacity-0 group-hover:opacity-100 hover:bg-[#F2F2F2] hover:text-[#19153F]"
-                      title="Edit"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      onClick={() => initiateDelete(project)}
-                      className="p-1.5 rounded-[4px] text-[#797979] opacity-0 group-hover:opacity-100 hover:bg-[#FFCDD3] hover:text-[#CC0015]"
-                      title="Delete"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </>
-                )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={projects.map((p) => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col">
+                {projects.map((project) => (
+                  <SortableProjectRow
+                    key={project.id}
+                    project={project}
+                    editingId={editingId}
+                    editName={editName}
+                    editInputRef={editInputRef}
+                    onEditStart={(p) => { setEditingId(p.id); setEditName(p.name) }}
+                    onEditNameChange={setEditName}
+                    onEditSave={handleEditSave}
+                    onEditCancel={() => setEditingId(null)}
+                    onDelete={initiateDelete}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
 
         <div className="flex flex-col gap-1 pt-1">

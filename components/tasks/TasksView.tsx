@@ -923,7 +923,7 @@ export default function TasksView() {
           .select('*')
           .eq('admin_user_id', userId)
           .is('deleted_at', null)
-          .order('name'),
+          .order('sort_order'),
       ])
 
       if (tasksRes.data) {
