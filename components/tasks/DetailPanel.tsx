@@ -145,7 +145,6 @@ export default function DetailPanel({
   readOnlyNotes = false,
 }: DetailPanelProps) {
   const { userId } = useAuth()
-  const USE_REAL_DATA = Boolean(userId)
 
   // Slide-in animation
   const [visible, setVisible] = useState(false)
@@ -184,10 +183,6 @@ export default function DetailPanel({
 
   // Fetch note
   useEffect(() => {
-    if (!USE_REAL_DATA) {
-      setNoteLoading(false)
-      return
-    }
     const fetchNote = async () => {
       setNoteLoading(true)
       const { data } = await supabase
@@ -207,10 +202,6 @@ export default function DetailPanel({
 
   // Fetch comments
   useEffect(() => {
-    if (!USE_REAL_DATA) {
-      setCommentsLoading(false)
-      return
-    }
     const fetchComments = async () => {
       setCommentsLoading(true)
       const { data } = await supabase
@@ -255,7 +246,6 @@ export default function DetailPanel({
   }, [initialSection])
 
   const handleNoteBlur = useCallback(async () => {
-    if (!USE_REAL_DATA) return
     if (noteContent === lastSavedContent.current) return
     setNoteSaving(true)
     const now = new Date().toISOString()
@@ -286,21 +276,6 @@ export default function DetailPanel({
 
   const handleAddComment = useCallback(async () => {
     if (!newComment.trim()) return
-    if (!USE_REAL_DATA) {
-      const mock: CommentRow = {
-        id: Math.random().toString(36).slice(2),
-        task_id: taskId,
-        content: newComment.trim(),
-        created_by: 'mock',
-        created_at: new Date().toISOString(),
-        updated_at: null,
-        updated_by: null,
-        author_name: 'You',
-      }
-      setComments((prev) => [...prev, mock])
-      setNewComment('')
-      return
-    }
     setAddingComment(true)
     const { data, error } = await supabase
       .from('task_comments')
@@ -317,17 +292,6 @@ export default function DetailPanel({
   const handleEditSave = useCallback(
     async (commentId: string) => {
       if (!editContent.trim()) return
-      if (!USE_REAL_DATA) {
-        setComments((prev) =>
-          prev.map((c) =>
-            c.id === commentId
-              ? { ...c, content: editContent.trim(), updated_at: new Date().toISOString() }
-              : c
-          )
-        )
-        setEditingCommentId(null)
-        return
-      }
       const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('task_comments')
@@ -346,10 +310,6 @@ export default function DetailPanel({
   )
 
   const handleDeleteComment = useCallback(async (commentId: string) => {
-    if (!USE_REAL_DATA) {
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
-      return
-    }
     const { error } = await supabase.from('task_comments').delete().eq('id', commentId)
     if (!error) {
       setComments((prev) => prev.filter((c) => c.id !== commentId))

@@ -22,8 +22,6 @@ import ProductBadge from './ProductBadge'
 import AddTaskModal from './AddTaskModal'
 import DetailPanel from './DetailPanel'
 import { supabase } from '@/lib/supabase/client'
-import { MOCK_TASKS } from '@/lib/mock-data'
-import type { MockTask } from '@/lib/mock-data'
 import type { TaskWithProject, ProjectRow } from '@/lib/supabase/types'
 import {
   getCurrentWeekIndex,
@@ -87,7 +85,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 
 // ─── Task normalisation ───────────────────────────────────────────────────────
 
-type AnyTask = TaskWithProject | MockTask
+type AnyTask = TaskWithProject
 
 function taskBg(t: AnyTask): React.CSSProperties {
   if (t.status === 'complete') return { backgroundColor: '#C3FFF8' }
@@ -102,8 +100,7 @@ function descClass(t: AnyTask): string {
 }
 
 function projectName(t: AnyTask): string {
-  if ('project_name' in t) return t.project_name ?? '—'
-  return (t as MockTask).project_name
+  return t.project_name ?? '—'
 }
 
 // ─── Delete confirmation modal ────────────────────────────────────────────────
@@ -853,7 +850,6 @@ function TaskTable({
 
 export default function TasksView() {
   const { userId } = useAuth()
-  const USE_REAL_DATA = Boolean(userId)
   const todayWeekIndex = getCurrentWeekIndex()
   const [viewMode, setViewMode] = useState<ViewMode>('focused')
   const [centerWeekIndex, setCenterWeekIndex] = useState(todayWeekIndex)
@@ -894,7 +890,6 @@ export default function TasksView() {
   // Fetch tasks and projects
   useEffect(() => {
     if (!userId) {
-      setTasks(MOCK_TASKS)
       setLoading(false)
       return
     }
@@ -958,7 +953,7 @@ export default function TasksView() {
     return () => clearTimeout(timer)
   }, [searchQuery, tasks])
 
-  // Unique projects derived from all tasks (works for both mock and real data)
+  // Unique projects derived from all tasks
   const uniqueProjects = useMemo<{ id: string; name: string }[]>(() => {
     const seen = new Map<string, string>()
     tasks.forEach((t) => {
@@ -1039,7 +1034,6 @@ export default function TasksView() {
         t.id === id ? { ...t, status: t.status === 'complete' ? 'open' : 'complete' } : t
       )
     )
-    if (!USE_REAL_DATA) return
     const task = tasks.find((t) => t.id === id)
     if (!task) return
     const newStatus = task.status === 'complete' ? 'open' : 'complete'
@@ -1059,7 +1053,6 @@ export default function TasksView() {
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, is_flagged: !t.is_flagged } : t))
     )
-    if (!USE_REAL_DATA) return
     const task = tasks.find((t) => t.id === id)
     if (!task) return
     const { error } = await supabase
@@ -1087,7 +1080,6 @@ export default function TasksView() {
     )
     addToast(`Task moved to ${formatWeekHeader(newIndex)}.`)
 
-    if (!USE_REAL_DATA) return
     const { error } = await supabase
       .from('tasks')
       .update({ week_start_date: newDate, updated_at: new Date().toISOString(), updated_by: userId })
@@ -1107,14 +1099,12 @@ export default function TasksView() {
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTaskId) return
     setDeleting(true)
-    if (USE_REAL_DATA) {
-      const { error } = await supabase.from('tasks').delete().eq('id', deleteTaskId)
-      if (error) {
-        addToast('Failed to delete task.', 'error')
-        setDeleting(false)
-        setDeleteTaskId(null)
-        return
-      }
+    const { error } = await supabase.from('tasks').delete().eq('id', deleteTaskId)
+    if (error) {
+      addToast('Failed to delete task.', 'error')
+      setDeleting(false)
+      setDeleteTaskId(null)
+      return
     }
     setTasks((prev) => prev.filter((t) => t.id !== deleteTaskId))
     addToast('Task deleted.')
@@ -1137,7 +1127,6 @@ export default function TasksView() {
       })
     })
 
-    if (!USE_REAL_DATA) return
     await Promise.all(
       orderedIds.map((id, idx) =>
         supabase

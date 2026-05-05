@@ -5,8 +5,6 @@ import Link from 'next/link'
 import ProductBadge from '@/components/tasks/ProductBadge'
 import DetailPanel from '@/components/tasks/DetailPanel'
 import { supabase } from '@/lib/supabase/client'
-import { MOCK_TASKS } from '@/lib/mock-data'
-import type { MockTask } from '@/lib/mock-data'
 import type { TaskWithProject } from '@/lib/supabase/types'
 import { ChevronLeft, ChevronRight, Search, PanelRight, FileText, MessageSquare, ArrowLeft } from 'lucide-react'
 import {
@@ -18,7 +16,7 @@ import {
 
 type ViewMode = 'focused' | 'expanded'
 type SortMode = 'drag' | 'product' | 'project'
-type AnyTask = TaskWithProject | MockTask
+type AnyTask = TaskWithProject
 
 const PRODUCT_ORDER: Record<string, number> = { AH: 0, EH: 1, NURO: 2 }
 
@@ -35,8 +33,7 @@ function descClass(t: AnyTask): string {
 }
 
 function projectName(t: AnyTask): string {
-  if ('project_name' in t) return t.project_name ?? '—'
-  return (t as MockTask).project_name
+  return t.project_name ?? '—'
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -472,15 +469,6 @@ export default function ManagerTaskView({ adminUserId }: ManagerTaskViewProps) {
 
   // Fetch tasks and admin name
   useEffect(() => {
-    const isRealUser = adminUserId && adminUserId !== 'demo-user' && adminUserId !== 'demo-user-2' && adminUserId !== 'demo-user-3'
-
-    if (!isRealUser) {
-      setTasks(MOCK_TASKS)
-      setAdminName('Demo User')
-      setLoading(false)
-      return
-    }
-
     const loadData = async () => {
       setLoading(true)
       const [tasksRes, userRes] = await Promise.all([

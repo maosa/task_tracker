@@ -78,7 +78,7 @@ export default function SignupPage() {
                 required
                 autoFocus
                 className="w-full h-9 px-3 text-[13px] border border-[#DADADA] rounded-md focus:outline-none focus:border-[#38308F] text-[#19153F]"
-                placeholder="Andreas"
+                placeholder="First name"
               />
             </div>
             <div>
@@ -89,7 +89,7 @@ export default function SignupPage() {
                 onChange={(e) => setLastName(e.target.value)}
                 required
                 className="w-full h-9 px-3 text-[13px] border border-[#DADADA] rounded-md focus:outline-none focus:border-[#38308F] text-[#19153F]"
-                placeholder="Maos"
+                placeholder="Last name"
               />
             </div>
           </div>
