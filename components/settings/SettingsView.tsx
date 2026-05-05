@@ -138,7 +138,7 @@ function AccountSection({ onToast }: { onToast: (msg: string, type?: 'success' |
       setLoading(false)
     }
     load()
-  }, [])
+  }, [userId])
 
   const handleSave = async () => {
     if (!userId) return
@@ -274,7 +274,7 @@ function ProjectsSection({ onToast }: { onToast: (msg: string, type?: 'success' 
 
   useEffect(() => {
     loadProjects()
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     if (editingId && editInputRef.current) {
@@ -483,7 +483,7 @@ function ManagerSection({ onToast }: { onToast: (msg: string, type?: 'success' |
 
   useEffect(() => {
     loadManagers()
-  }, [])
+  }, [userId])
 
   async function loadManagers() {
     if (!userId) { setLoadingManagers(false); return }
