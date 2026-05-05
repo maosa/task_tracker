@@ -13,12 +13,14 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [duplicateEmail, setDuplicateEmail] = useState(false)
   const [loading, setLoading] = useState(false)
   const [confirmMessage, setConfirmMessage] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setDuplicateEmail(false)
     setLoading(true)
 
     const { data, error: authError } = await supabase.auth.signUp({
@@ -39,7 +41,7 @@ export default function SignupPage() {
     // identities is empty when the email is already registered (confirmed or not).
     // Supabase does not send a new confirmation email in this case.
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
-      setError('An account with this email already exists. Please sign in instead.')
+      setDuplicateEmail(true)
       setLoading(false)
       return
     }
@@ -137,6 +139,17 @@ export default function SignupPage() {
             />
           </div>
 
+          {duplicateEmail && (
+            <div className="rounded-md bg-[#FFF0F2] border border-[#FFC4CB] px-3 py-2.5 text-[12px] text-[#CC0015] space-y-1">
+              <p className="font-medium">An account with this email already exists.</p>
+              <p>
+                <Link href="/login" className="underline hover:text-[#a3000f]">Sign in</Link>
+                {' '}to your account, or use{' '}
+                <Link href="/forgot-password" className="underline hover:text-[#a3000f]">Forgot password</Link>
+                {' '}to reset your password.
+              </p>
+            </div>
+          )}
           {error && <p className="text-[12px] text-[#CC0015]">{error}</p>}
 
           <button
