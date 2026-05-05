@@ -43,7 +43,7 @@ export default function SignupPage() {
         .eq('id', data.user.id)
 
       if (!data.session) {
-        setConfirmMessage('Check your email to confirm your account, then sign in.')
+        setConfirmMessage('confirm')
         setLoading(false)
         return
       }
@@ -54,19 +54,23 @@ export default function SignupPage() {
 
   return (
     <div className="w-full max-w-sm bg-white rounded-xl border border-[#DADADA] p-8 shadow-sm">
-      <div className="mb-6">
-        <h1 className="text-[18px] font-medium text-[#19153F]">Create account</h1>
-        <p className="text-[13px] text-[#595959] mt-1">Task Tracker</p>
-      </div>
-
       {confirmMessage ? (
         <div className="space-y-4 text-center">
-          <p className="text-[13px] text-[#19153F]">{confirmMessage}</p>
+          <div className="mb-6">
+            <h1 className="text-[18px] font-medium text-[#19153F]">Confirm your email address</h1>
+            <p className="text-[13px] text-[#595959] mt-1">Task Tracker</p>
+          </div>
+          <p className="text-[13px] text-[#595959]">Check your email to activate your account.</p>
           <Link href="/login" className="block text-[13px] text-[#38308F] hover:underline">
             Back to sign in
           </Link>
         </div>
       ) : (
+        <>
+        <div className="mb-6">
+          <h1 className="text-[18px] font-medium text-[#19153F]">Create account</h1>
+          <p className="text-[13px] text-[#595959] mt-1">Task Tracker</p>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -140,15 +144,13 @@ export default function SignupPage() {
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
-      )}
-
-      {!confirmMessage && (
         <p className="mt-4 text-[12px] text-[#595959] text-center">
           Already have an account?{' '}
           <Link href="/login" className="text-[#38308F] hover:underline">
             Sign in
           </Link>
         </p>
+        </>
       )}
     </div>
   )
